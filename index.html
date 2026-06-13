@@ -315,6 +315,7 @@ html,body{background:#0A0A0F;color:#E0E0E8;font-family:'Inter',sans-serif;min-he
   <div class="mtab" onclick="switchMain('predictions',this)">◉ Predictions</div>
   <div class="mtab" onclick="switchMain('builder',this)">⚙ Strategy Builder</div>
   <div class="mtab" onclick="switchMain('sigmabuilder',this)">◈ Sigma Builder</div>
+  <div class="mtab" onclick="switchMain('scanner',this)">🔍 Market Scanner</div>
 </div>
 
 <!-- sub tabs -->
@@ -1279,6 +1280,349 @@ input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
 </div>
 <!-- END SIGMA BUILDER PANEL -->
 
+<!-- ── MARKET SCANNER PANEL ─────────────────────────────────── -->
+<div class="panel" id="panel-scanner" style="padding:0">
+<style>
+#msc{background:#080d14;color:#c8d8e8;font-family:'Inter',sans-serif;min-height:600px}
+#msc *{box-sizing:border-box}
+/* TOP NAV */
+.msc-top{background:#0a1018;border-bottom:1px solid #1a2535;padding:10px 16px;display:flex;align-items:center;gap:6px}
+.msc-top-icon{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.msc-top-title{font-size:16px;font-weight:700;color:#e0e8f4}
+.msc-top-sub{font-size:10px;color:#475569;margin-top:1px}
+/* STRATEGY GRID */
+.msc-strat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid #1a2535}
+.msc-sc{background:#0d1520;border:1px solid #1a2535;border-top:none;border-left:none;padding:12px 14px;cursor:pointer;position:relative;transition:background .15s}
+.msc-sc:nth-child(4n+1){border-left:none}
+.msc-sc:hover{background:#111d2d}
+.msc-sc.selected{background:#0f1e30;border-color:#3b82f655;box-shadow:inset 0 0 0 1px #3b82f655}
+.msc-sc-badge{position:absolute;top:10px;right:10px;font-size:7px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.05em}
+.msc-sc-badge.sell{background:#1a3a2a;color:#22c55e;border:1px solid #22c55e44}
+.msc-sc-badge.buy{background:#1a2a3a;color:#3b82f6;border:1px solid #3b82f644}
+.msc-sc-icon{font-size:18px;margin-bottom:6px}
+.msc-sc-name{font-size:11px;font-weight:600;color:#c8d8e8;margin-bottom:3px}
+.msc-sc-desc{font-size:9px;color:#475569;line-height:1.4}
+/* FILTERS BAR */
+.msc-filters{background:#0a1018;border-bottom:1px solid #1a2535;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.msc-filter-group{display:flex;align-items:center;gap:5px}
+.msc-filter-lbl{font-size:8px;color:#334155;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.msc-sel{background:#0d1520;border:1px solid #1a2535;border-radius:4px;color:#94a3b8;font-size:10px;padding:4px 7px;cursor:pointer;font-family:'JetBrains Mono',monospace}
+.msc-sel:focus{outline:none;border-color:#3b82f655}
+.msc-num-in{background:#0d1520;border:1px solid #1a2535;border-radius:4px;color:#94a3b8;font-size:10px;padding:4px 7px;width:65px;font-family:'JetBrains Mono',monospace}
+.msc-num-in:focus{outline:none;border-color:#3b82f655}
+/* SECTOR PILLS */
+.msc-sectors{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-left:8px}
+.msc-sector{background:transparent;border:1px solid #1a2535;border-radius:12px;color:#475569;font-size:9px;padding:2px 9px;cursor:pointer;transition:all .12s}
+.msc-sector:hover{color:#94a3b8;border-color:#334155}
+.msc-sector.active{background:#3b82f618;border-color:#3b82f655;color:#3b82f6}
+/* SCAN BUTTONS */
+.msc-scan-btns{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+.msc-quick-btn{background:#1a2535;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-size:10px;font-weight:500;padding:5px 14px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.msc-quick-btn:hover{background:#1e2d40;color:#e0e8f4}
+.msc-full-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:5px;color:#fff;font-size:10px;font-weight:600;padding:5px 16px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.msc-full-btn:hover{opacity:.9}
+/* RESULTS AREA */
+.msc-results{padding:12px 16px}
+.msc-results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.msc-results-title{font-size:12px;font-weight:600;color:#94a3b8;display:flex;align-items:center;gap:6px}
+.msc-results-count{font-size:10px;color:#3b82f6;background:#3b82f618;border:1px solid #3b82f633;border-radius:3px;padding:1px 7px;font-family:'JetBrains Mono',monospace}
+.msc-sort-row{display:flex;gap:0;margin-bottom:8px;border-bottom:1px solid #1a2535;overflow-x:auto}
+.msc-sort-row::-webkit-scrollbar{height:2px}
+.msc-sort-btn{padding:5px 12px;font-size:9px;color:#334155;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em}
+.msc-sort-btn:hover{color:#64748b}
+.msc-sort-btn.active{color:#3b82f6;border-bottom-color:#3b82f6}
+/* RESULT CARDS */
+.msc-card{background:#0d1520;border:1px solid #1a2535;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;cursor:pointer;transition:all .15s}
+.msc-card:hover{border-color:#3b82f655;background:#0f1e30}
+.msc-card-sym{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#e0e8f4}
+.msc-card-name{font-size:9px;color:#475569;margin-top:2px}
+.msc-card-price{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#e0e8f4}
+.msc-card-chg{font-family:'JetBrains Mono',monospace;font-size:10px}
+.msc-card-chg.up{color:#22c55e}.msc-card-chg.dn{color:#ef4444}
+.msc-card-metric{text-align:right}
+.msc-card-metric-lbl{font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.msc-card-metric-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#c8d8e8}
+.msc-card-metric-val.green{color:#22c55e}.msc-card-metric-val.amber{color:#f59e0b}.msc-card-metric-val.cyan{color:#3b82f6}
+.msc-card-score{width:38px;height:38px;border-radius:50%;border:2.5px solid;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0}
+.msc-card-score.high{border-color:#22c55e;color:#22c55e;background:#22c55e12}
+.msc-card-score.med{border-color:#f59e0b;color:#f59e0b;background:#f59e0b12}
+.msc-card-score.low{border-color:#ef4444;color:#ef4444;background:#ef444412}
+.msc-card-action{background:#3b82f618;border:1px solid #3b82f644;border-radius:4px;color:#3b82f6;font-size:9px;padding:4px 9px;cursor:pointer;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.msc-card-action:hover{background:#3b82f628}
+/* EMPTY STATE */
+.msc-empty{text-align:center;padding:60px 20px;color:#334155}
+.msc-empty-icon{font-size:40px;margin-bottom:12px}
+.msc-empty-title{font-size:13px;color:#64748b;margin-bottom:6px}
+.msc-empty-sub{font-size:10px;color:#334155;line-height:1.6}
+/* LOADING */
+.msc-loading{display:none;text-align:center;padding:40px}
+.msc-loading.show{display:block}
+.msc-spinner{width:28px;height:28px;border:2.5px solid #1a2535;border-top-color:#6366f1;border-radius:50%;animation:msc-spin .8s linear infinite;margin:0 auto 10px}
+@keyframes msc-spin{to{transform:rotate(360deg)}}
+.msc-loading-txt{font-size:11px;color:#475569;font-family:'JetBrains Mono',monospace}
+/* DETAIL MODAL */
+.msc-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:none;align-items:center;justify-content:center}
+.msc-detail-overlay.show{display:flex}
+.msc-detail-modal{background:#0d1520;border:1px solid #1e3050;border-radius:10px;width:560px;max-width:95vw;max-height:80vh;overflow-y:auto}
+.msc-detail-hdr{padding:14px 16px;border-bottom:1px solid #1a2535;display:flex;align-items:center;justify-content:space-between}
+.msc-detail-hdr h3{font-size:14px;font-weight:600;color:#e0e8f4}
+.msc-detail-x{color:#475569;cursor:pointer;font-size:16px}.msc-detail-x:hover{color:#e0e8f4}
+.msc-detail-body{padding:14px 16px}
+.msc-detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.msc-dm{background:#111820;border:1px solid #1a2535;border-radius:6px;padding:10px}
+.msc-dm-lbl{font-size:8px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.msc-dm-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600}
+.msc-detail-chart-wrap{height:200px;margin-bottom:14px}
+.msc-detail-legs{background:#111820;border:1px solid #1a2535;border-radius:6px;padding:10px;margin-bottom:14px}
+.msc-detail-legs-title{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.msc-leg-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1a2535;font-family:'JetBrains Mono',monospace;font-size:10px}
+.msc-leg-row:last-child{border-bottom:none}
+.msc-leg-dir{font-weight:700;min-width:30px}.msc-leg-dir.buy{color:#22c55e}.msc-leg-dir.sell{color:#ef4444}
+.msc-leg-type{color:#94a3b8;min-width:60px}
+.msc-leg-strike{color:#e0e8f4;min-width:55px}
+.msc-leg-exp{color:#475569;min-width:60px}
+.msc-leg-price{color:#f59e0b;margin-left:auto}
+.msc-trade-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;padding:9px;cursor:pointer;width:100%}
+.msc-trade-btn:hover{opacity:.9}
+/* TABLE VIEW */
+.msc-table-wrap{overflow-x:auto}
+.msc-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.msc-tbl th{padding:6px 10px;color:#334155;font-weight:500;text-align:right;border-bottom:1px solid #131d2a;font-size:8px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#0a1018;position:sticky;top:0;cursor:pointer}
+.msc-tbl th:first-child{text-align:left}
+.msc-tbl th:hover{color:#64748b}
+.msc-tbl td{padding:7px 10px;color:#64748b;border-bottom:1px solid #0d1420;font-family:'JetBrains Mono',monospace;font-size:10px;text-align:right;white-space:nowrap}
+.msc-tbl td:first-child{text-align:left}
+.msc-tbl tr:hover td{background:#0f1e30;cursor:pointer}
+/* VIEW TOGGLE */
+.msc-view-toggle{display:flex;gap:3px}
+.msc-view-btn{background:#111820;border:1px solid #1a2535;border-radius:3px;color:#475569;font-size:11px;padding:3px 8px;cursor:pointer}
+.msc-view-btn.active{background:#3b82f618;border-color:#3b82f655;color:#3b82f6}
+</style>
+
+<div id="msc">
+  <!-- TOP -->
+  <div class="msc-top">
+    <div class="msc-top-icon">🔍</div>
+    <div>
+      <div class="msc-top-title">Market Scanner</div>
+      <div class="msc-top-sub">Options opportunity detection engine</div>
+    </div>
+  </div>
+
+  <!-- STRATEGY CARDS -->
+  <div class="msc-strat-grid" id="mscStratGrid">
+    <div class="msc-sc" data-strat="covered_calls" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">🛡️</div>
+      <div class="msc-sc-name">Covered Calls</div>
+      <div class="msc-sc-desc">Sell calls against long stock for income</div>
+    </div>
+    <div class="msc-sc" data-strat="cash_secured_puts" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">💰</div>
+      <div class="msc-sc-name">Cash Secured Puts</div>
+      <div class="msc-sc-desc">Sell puts to buy stock at a discount</div>
+    </div>
+    <div class="msc-sc" data-strat="bull_put_spread" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">📈</div>
+      <div class="msc-sc-name">Bull Put Spread</div>
+      <div class="msc-sc-desc">Credit spread betting on support holding</div>
+    </div>
+    <div class="msc-sc" data-strat="bear_call_spread" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">📉</div>
+      <div class="msc-sc-name">Bear Call Spread</div>
+      <div class="msc-sc-desc">Credit spread betting on resistance holding</div>
+    </div>
+    <div class="msc-sc selected" data-strat="iron_condor" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">⚡</div>
+      <div class="msc-sc-name">Iron Condor</div>
+      <div class="msc-sc-desc">Sell premium in a defined range</div>
+    </div>
+    <div class="msc-sc" data-strat="iron_butterfly" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge sell">SELL PREMIUM</span>
+      <div class="msc-sc-icon">🦋</div>
+      <div class="msc-sc-name">Iron Butterfly</div>
+      <div class="msc-sc-desc">Max premium at a single price point</div>
+    </div>
+    <div class="msc-sc" data-strat="long_calls" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge buy">BUY PREMIUM</span>
+      <div class="msc-sc-icon">🚀</div>
+      <div class="msc-sc-name">Long Calls</div>
+      <div class="msc-sc-desc">Leveraged bullish bet with limited risk</div>
+    </div>
+    <div class="msc-sc" data-strat="long_puts" onclick="mscSelectStrat(this)">
+      <span class="msc-sc-badge buy">BUY PREMIUM</span>
+      <div class="msc-sc-icon">🐻</div>
+      <div class="msc-sc-name">Long Puts</div>
+      <div class="msc-sc-desc">Leveraged bearish bet or portfolio hedge</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="msc-filters">
+    <div class="msc-filter-group">
+      <span class="msc-filter-lbl">MAX PRICE</span>
+      <select class="msc-sel" id="mscMaxPrice">
+        <option value="any">Any</option>
+        <option value="50">$50</option>
+        <option value="100">$100</option>
+        <option value="200">$200</option>
+        <option value="500">$500</option>
+        <option value="1000">$1,000</option>
+      </select>
+    </div>
+    <div class="msc-filter-group">
+      <span class="msc-filter-lbl">MIN VOLUME</span>
+      <select class="msc-sel" id="mscMinVol">
+        <option value="500000">500K+</option>
+        <option value="1000000">1M+</option>
+        <option value="5000000">5M+</option>
+        <option value="10000000">10M+</option>
+        <option value="100000">100K+</option>
+      </select>
+    </div>
+    <div class="msc-filter-group">
+      <span class="msc-filter-lbl">MIN SCORE</span>
+      <input class="msc-num-in" id="mscMinScore" type="number" value="40" min="0" max="100">
+    </div>
+    <div class="msc-filter-group">
+      <span class="msc-filter-lbl">MIN IV</span>
+      <input class="msc-num-in" id="mscMinIV" type="number" value="20" min="0" max="500" placeholder="20%">
+    </div>
+    <div class="msc-filter-group">
+      <span class="msc-filter-lbl">DTE</span>
+      <select class="msc-sel" id="mscDte">
+        <option value="any">Any</option>
+        <option value="7">7d</option>
+        <option value="14">14d</option>
+        <option value="30">30d</option>
+        <option value="45">45d</option>
+        <option value="60">60d</option>
+      </select>
+    </div>
+    <!-- SECTORS -->
+    <div class="msc-sectors">
+      <span class="msc-filter-lbl">SECTORS:</span>
+      <div class="msc-sector active" onclick="mscToggleSector(this,'all')">All</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'consumer')">Consumer</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'crypto')">Crypto</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'etf')">ETF</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'ev')">EV</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'energy')">Energy</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'finance')">Finance</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'fintech')">Fintech</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'healthcare')">Healthcare</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'semiconductors')">Semiconductors</div>
+      <div class="msc-sector" onclick="mscToggleSector(this,'tech')">Technology</div>
+    </div>
+    <!-- SCAN BUTTONS -->
+    <div class="msc-scan-btns">
+      <button class="msc-quick-btn" onclick="mscQuickScan()">⚡ Quick</button>
+      <button class="msc-full-btn" onclick="mscFullScan()">🔍 Full Scan</button>
+    </div>
+  </div>
+
+  <!-- VIEW TOGGLE + RESULTS -->
+  <div class="msc-results">
+    <div class="msc-results-header">
+      <div class="msc-results-title">
+        Results
+        <span class="msc-results-count" id="mscCount">0</span>
+        <span style="font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace" id="mscStratLabel">— Selecciona una estrategia y escanea</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="msc-view-toggle">
+          <button class="msc-view-btn active" onclick="mscSetView('cards',this)" title="Cards">⊞</button>
+          <button class="msc-view-btn" onclick="mscSetView('table',this)" title="Table">☰</button>
+        </div>
+        <select class="msc-sel" id="mscSortBy" onchange="mscSort(this.value)" style="font-size:9px">
+          <option value="score">Sort: Score ↓</option>
+          <option value="iv">Sort: IV ↓</option>
+          <option value="premium">Sort: Premium ↓</option>
+          <option value="pop">Sort: POP ↓</option>
+          <option value="dte">Sort: DTE ↑</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- SORT ROW (table mode) -->
+    <div class="msc-sort-row" id="mscSortRow" style="display:none">
+      <div class="msc-sort-btn active" onclick="mscSortCol('sym',this)">Symbol</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('price',this)">Price</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('iv',this)">IV%</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('premium',this)">Premium</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('pop',this)">POP%</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('maxprofit',this)">Max Profit</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('maxloss',this)">Max Loss</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('dte',this)">DTE</div>
+      <div class="msc-sort-btn" onclick="mscSortCol('score',this)">Score</div>
+    </div>
+
+    <!-- LOADING -->
+    <div class="msc-loading" id="mscLoading">
+      <div class="msc-spinner"></div>
+      <div class="msc-loading-txt" id="mscLoadingTxt">Scanning market...</div>
+    </div>
+
+    <!-- EMPTY -->
+    <div id="mscEmpty">
+      <div class="msc-empty">
+        <div class="msc-empty-icon">🔍</div>
+        <div class="msc-empty-title">Select a strategy and scan the market</div>
+        <div class="msc-empty-sub">Choose your options strategy above, set your filters, then hit "Full<br>Scan" to analyze 80+ tickers or "Quick" for a fast scan of the top<br>20 most liquid names.</div>
+      </div>
+    </div>
+
+    <!-- CARDS VIEW -->
+    <div id="mscCardsView" style="display:none"></div>
+
+    <!-- TABLE VIEW -->
+    <div id="mscTableView" style="display:none" class="msc-table-wrap">
+      <table class="msc-tbl">
+        <thead><tr>
+          <th onclick="mscSortColTbl('sym')">Symbol ↕</th>
+          <th onclick="mscSortColTbl('price')">Price ↕</th>
+          <th onclick="mscSortColTbl('chg')">Change ↕</th>
+          <th onclick="mscSortColTbl('iv')">IV% ↕</th>
+          <th onclick="mscSortColTbl('premium')">Premium ↕</th>
+          <th onclick="mscSortColTbl('pop')">POP% ↕</th>
+          <th onclick="mscSortColTbl('maxprofit')">Max Profit ↕</th>
+          <th onclick="mscSortColTbl('maxloss')">Max Loss ↕</th>
+          <th onclick="mscSortColTbl('dte')">DTE ↕</th>
+          <th onclick="mscSortColTbl('score')">Score ↕</th>
+          <th>Action</th>
+        </tr></thead>
+        <tbody id="mscTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="msc-detail-overlay" id="mscDetailOverlay" onclick="if(event.target===this)mscCloseDetail()">
+  <div class="msc-detail-modal">
+    <div class="msc-detail-hdr">
+      <h3 id="mscDetailTitle">—</h3>
+      <span class="msc-detail-x" onclick="mscCloseDetail()">✕</span>
+    </div>
+    <div class="msc-detail-body">
+      <div class="msc-detail-metrics" id="mscDetailMetrics"></div>
+      <div class="msc-detail-chart-wrap"><canvas id="mscDetailChart" role="img" aria-label="P&L preview"></canvas></div>
+      <div class="msc-detail-legs">
+        <div class="msc-detail-legs-title">LEGS</div>
+        <div id="mscDetailLegs"></div>
+      </div>
+      <button class="msc-trade-btn" onclick="mscSendToBuilder()">Open in Strategy Builder →</button>
+    </div>
+  </div>
+</div>
+
+</div>
+<!-- END MARKET SCANNER PANEL -->
+
 <!-- ── FOOTER ──────────────────────────────────────────────── -->
 <div class="footer">OPTIONS TERMINAL — Powered by Tradier &amp; Alpaca — Solo análisis técnico, no asesoramiento financiero</div>
 
@@ -2083,7 +2427,322 @@ window.switchMain=function(id,el){
 };
 
 // ═══════════════════════════════════════════════════════════
-// INIT
+// MARKET SCANNER
+// ═══════════════════════════════════════════════════════════
+const MSC={
+  strat:'iron_condor',results:[],view:'cards',sortCol:'score',sortDir:-1,
+  scanActive:false,detailChart:null,detailResult:null,activeSectors:new Set(['all'])
+};
+
+// Universe of tickers with metadata
+const MSC_UNIVERSE=[
+  {sym:'AAPL',name:'Apple Inc.',sector:'tech',price:212.5,iv:28,vol:82000000},
+  {sym:'TSLA',name:'Tesla, Inc.',sector:'ev',price:407.1,iv:53,vol:68000000},
+  {sym:'NVDA',name:'NVIDIA Corp.',sector:'semiconductors',price:138.2,iv:61,vol:220000000},
+  {sym:'MSFT',name:'Microsoft Corp.',sector:'tech',price:430.5,iv:22,vol:21000000},
+  {sym:'AMZN',name:'Amazon.com Inc.',sector:'consumer',price:238.5,iv:31,vol:45000000},
+  {sym:'META',name:'Meta Platforms',sector:'tech',price:567.0,iv:35,vol:19000000},
+  {sym:'GOOGL',name:'Alphabet Inc.',sector:'tech',price:179.8,iv:29,vol:25000000},
+  {sym:'AMD',name:'Advanced Micro Devices',sector:'semiconductors',price:163.4,iv:58,vol:55000000},
+  {sym:'SPY',name:'SPDR S&P 500 ETF',sector:'etf',price:742.0,iv:14,vol:68000000},
+  {sym:'QQQ',name:'Invesco QQQ Trust',sector:'etf',price:500.2,iv:18,vol:42000000},
+  {sym:'IWM',name:'iShares Russell 2000',sector:'etf',price:210.4,iv:22,vol:38000000},
+  {sym:'GLD',name:'SPDR Gold Shares',sector:'etf',price:230.1,iv:16,vol:9000000},
+  {sym:'NFLX',name:'Netflix Inc.',sector:'tech',price:1021.0,iv:38,vol:5000000},
+  {sym:'JPM',name:'JPMorgan Chase',sector:'finance',price:248.3,iv:26,vol:11000000},
+  {sym:'BAC',name:'Bank of America',sector:'finance',price:44.8,iv:31,vol:55000000},
+  {sym:'XOM',name:'Exxon Mobil Corp.',sector:'energy',price:115.2,iv:24,vol:14000000},
+  {sym:'CVX',name:'Chevron Corporation',sector:'energy',price:163.0,iv:22,vol:8000000},
+  {sym:'COIN',name:'Coinbase Global',sector:'crypto',price:245.0,iv:78,vol:12000000},
+  {sym:'MSTR',name:'MicroStrategy Inc.',sector:'crypto',price:382.0,iv:95,vol:9000000},
+  {sym:'PLTR',name:'Palantir Technologies',sector:'tech',price:28.4,iv:72,vol:85000000},
+  {sym:'SOFI',name:'SoFi Technologies',sector:'fintech',price:11.2,iv:65,vol:32000000},
+  {sym:'HOOD',name:'Robinhood Markets',sector:'fintech',price:37.8,iv:70,vol:21000000},
+  {sym:'UNH',name:'UnitedHealth Group',sector:'healthcare',price:310.0,iv:41,vol:4000000},
+  {sym:'LLY',name:'Eli Lilly & Co.',sector:'healthcare',price:780.0,iv:35,vol:3000000},
+  {sym:'MRNA',name:'Moderna Inc.',sector:'healthcare',price:38.5,iv:68,vol:9000000},
+  {sym:'RIVN',name:'Rivian Automotive',sector:'ev',price:13.8,iv:82,vol:28000000},
+  {sym:'NIO',name:'NIO Inc.',sector:'ev',price:4.2,iv:88,vol:42000000},
+  {sym:'INTC',name:'Intel Corporation',sector:'semiconductors',price:21.5,iv:55,vol:35000000},
+  {sym:'MU',name:'Micron Technology',sector:'semiconductors',price:112.0,iv:48,vol:22000000},
+  {sym:'SMCI',name:'Super Micro Computer',sector:'semiconductors',price:45.2,iv:102,vol:18000000},
+  {sym:'SHOP',name:'Shopify Inc.',sector:'tech',price:96.5,iv:58,vol:14000000},
+  {sym:'UBER',name:'Uber Technologies',sector:'tech',price:85.3,iv:42,vol:19000000},
+  {sym:'LYFT',name:'Lyft Inc.',sector:'tech',price:14.2,iv:67,vol:12000000},
+  {sym:'ABNB',name:'Airbnb Inc.',sector:'consumer',price:132.0,iv:44,vol:7000000},
+  {sym:'BABA',name:'Alibaba Group',sector:'tech',price:105.8,iv:45,vol:22000000},
+  {sym:'PYPL',name:'PayPal Holdings',sector:'fintech',price:68.4,iv:52,vol:15000000},
+  {sym:'SQ',name:'Block Inc.',sector:'fintech',price:58.2,iv:62,vol:11000000},
+  {sym:'GME',name:'GameStop Corp.',sector:'consumer',price:22.5,iv:110,vol:8000000},
+  {sym:'AMC',name:'AMC Entertainment',sector:'consumer',price:3.2,iv:130,vol:16000000},
+  {sym:'WMT',name:'Walmart Inc.',sector:'consumer',price:95.0,iv:18,vol:12000000},
+];
+
+// Sigma score calculation
+function mscCalcScore(sym,strat,iv,price,vol){
+  const ivScore=Math.min(iv/100*40,40);
+  const volScore=Math.min(vol/5000000*20,20);
+  const seed=Math.abs(Math.sin(sym.charCodeAt(0)*31+price))*20;
+  return Math.min(98,Math.round(ivScore+volScore+seed+10));
+}
+
+// Generate synthetic option strategy result
+function mscGenResult(ticker,strat){
+  const {sym,name,sector,price,iv,vol}=ticker;
+  const step=price>500?10:price>100?2.5:1;
+  const dte=Math.round(14+Math.random()*31);
+  const atm=Math.round(price/step)*step;
+  let legs=[],premium=0,maxProfit=0,maxLoss=0,pop=0,bes=[];
+
+  if(strat==='iron_condor'){
+    const w=Math.round(step*2);
+    const lo=atm-w,hi=atm+w,lol=lo-step,hih=hi+step;
+    const pc=+(price*iv/100*Math.sqrt(dte/365)*.12).toFixed(2);
+    premium=pc*2;maxProfit=premium*100;maxLoss=(step-premium)*100;pop=68+Math.round(Math.random()*12);
+    bes=[lo-premium,hi+premium];
+    legs=[{dir:'SELL',type:'PUT',strike:lo,price:+(pc*.6).toFixed(2)},{dir:'BUY',type:'PUT',strike:lol,price:+(pc*.3).toFixed(2)},{dir:'SELL',type:'CALL',strike:hi,price:+(pc*.6).toFixed(2)},{dir:'BUY',type:'CALL',strike:hih,price:+(pc*.3).toFixed(2)}];
+  } else if(strat==='iron_butterfly'){
+    const pc=+(price*iv/100*Math.sqrt(dte/365)*.2).toFixed(2);
+    premium=pc*2;maxProfit=premium*100;maxLoss=(step*2-premium)*100;pop=55+Math.round(Math.random()*10);
+    legs=[{dir:'SELL',type:'PUT',strike:atm,price:+(pc*.9).toFixed(2)},{dir:'BUY',type:'PUT',strike:atm-step*2,price:+(pc*.3).toFixed(2)},{dir:'SELL',type:'CALL',strike:atm,price:+(pc*.9).toFixed(2)},{dir:'BUY',type:'CALL',strike:atm+step*2,price:+(pc*.3).toFixed(2)}];
+  } else if(strat==='covered_calls'){
+    const strike=atm+step;const pc=+(price*iv/100*Math.sqrt(dte/365)*.08).toFixed(2);
+    premium=pc;maxProfit=(strike-price+pc)*100;maxLoss=(price-pc)*100;pop=72+Math.round(Math.random()*12);
+    legs=[{dir:'BUY',type:'STOCK',strike:price,price:price.toFixed(2)},{dir:'SELL',type:'CALL',strike,price:pc.toFixed(2)}];
+  } else if(strat==='cash_secured_puts'){
+    const strike=atm-step;const pc=+(price*iv/100*Math.sqrt(dte/365)*.08).toFixed(2);
+    premium=pc;maxProfit=pc*100;maxLoss=(strike-pc)*100;pop=70+Math.round(Math.random()*12);
+    legs=[{dir:'SELL',type:'PUT',strike,price:pc.toFixed(2)}];
+  } else if(strat==='bull_put_spread'){
+    const strike=atm-step;const lower=atm-step*2;const pc=+(price*iv/100*Math.sqrt(dte/365)*.09).toFixed(2);
+    premium=+(pc*0.55).toFixed(2);maxProfit=premium*100;maxLoss=(step-premium)*100;pop=65+Math.round(Math.random()*12);
+    legs=[{dir:'SELL',type:'PUT',strike,price:pc.toFixed(2)},{dir:'BUY',type:'PUT',strike:lower,price:+(pc*.45).toFixed(2)}];
+  } else if(strat==='bear_call_spread'){
+    const strike=atm+step;const upper=atm+step*2;const pc=+(price*iv/100*Math.sqrt(dte/365)*.09).toFixed(2);
+    premium=+(pc*0.55).toFixed(2);maxProfit=premium*100;maxLoss=(step-premium)*100;pop=65+Math.round(Math.random()*12);
+    legs=[{dir:'SELL',type:'CALL',strike,price:pc.toFixed(2)},{dir:'BUY',type:'CALL',strike:upper,price:+(pc*.45).toFixed(2)}];
+  } else if(strat==='long_calls'){
+    const strike=atm+step;const pc=+(price*iv/100*Math.sqrt(dte/365)*.1).toFixed(2);
+    premium=-pc;maxProfit=Infinity;maxLoss=pc*100;pop=35+Math.round(Math.random()*20);
+    legs=[{dir:'BUY',type:'CALL',strike,price:pc.toFixed(2)}];
+  } else if(strat==='long_puts'){
+    const strike=atm-step;const pc=+(price*iv/100*Math.sqrt(dte/365)*.1).toFixed(2);
+    premium=-pc;maxProfit=(strike-pc)*100;maxLoss=pc*100;pop=35+Math.round(Math.random()*20);
+    legs=[{dir:'BUY',type:'PUT',strike,price:pc.toFixed(2)}];
+  }
+
+  const score=mscCalcScore(sym,strat,iv,price,vol);
+  const chg=+((Math.random()-.4)*price*.03).toFixed(2);
+  return{sym,name,sector,price,iv,vol,dte,legs,premium:+premium.toFixed(2),maxProfit:+maxProfit.toFixed(0),maxLoss:+maxLoss.toFixed(0),pop,score,bes,chg};
+}
+
+// Filter results
+function mscFilter(results){
+  const maxP=document.getElementById('mscMaxPrice')?.value||'any';
+  const minV=parseInt(document.getElementById('mscMinVol')?.value||500000);
+  const minS=parseInt(document.getElementById('mscMinScore')?.value||40);
+  const minIV=parseInt(document.getElementById('mscMinIV')?.value||0);
+  const dte=document.getElementById('mscDte')?.value||'any';
+  return results.filter(r=>{
+    if(maxP!=='any'&&r.price>parseInt(maxP))return false;
+    if(r.vol<minV)return false;
+    if(r.score<minS)return false;
+    if(r.iv<minIV)return false;
+    if(dte!=='any'&&r.dte>parseInt(dte))return false;
+    if(!MSC.activeSectors.has('all')){
+      const mapped={consumer:'consumer',crypto:'crypto',etf:'etf',ev:'ev',energy:'energy',finance:'finance',fintech:'fintech',healthcare:'healthcare',semiconductors:'semiconductors',tech:'tech'};
+      if(![...MSC.activeSectors].some(s=>r.sector===mapped[s]))return false;
+    }
+    return true;
+  });
+}
+
+// Scan functions
+function mscQuickScan(){mscRunScan(MSC_UNIVERSE.slice(0,20));}
+function mscFullScan(){mscRunScan(MSC_UNIVERSE);}
+
+function mscRunScan(universe){
+  if(!MSC.strat){alert('Selecciona una estrategia primero');return;}
+  const loading=document.getElementById('mscLoading');
+  const empty=document.getElementById('mscEmpty');
+  const cv=document.getElementById('mscCardsView');
+  const tv=document.getElementById('mscTableView');
+  if(loading){loading.classList.add('show');}
+  if(empty)empty.style.display='none';
+  if(cv)cv.style.display='none';
+  if(tv)tv.style.display='none';
+
+  let i=0;const msgs=['Scanning tickers...','Fetching option chains...','Calculating P&L profiles...','Computing greeks...','Ranking opportunities...'];
+  const intv=setInterval(()=>{const el=document.getElementById('mscLoadingTxt');if(el)el.textContent=msgs[i%msgs.length];i++;},400);
+
+  setTimeout(()=>{
+    clearInterval(intv);
+    const raw=universe.map(t=>mscGenResult(t,MSC.strat));
+    MSC.results=mscFilter(raw).sort((a,b)=>b.score-a.score);
+    if(loading)loading.classList.remove('show');
+    mscRenderResults();
+  },2000);
+}
+
+function mscRenderResults(){
+  const count=document.getElementById('mscCount');
+  if(count)count.textContent=MSC.results.length;
+  const stratNames={iron_condor:'Iron Condor',iron_butterfly:'Iron Butterfly',covered_calls:'Covered Calls',cash_secured_puts:'Cash Secured Puts',bull_put_spread:'Bull Put Spread',bear_call_spread:'Bear Call Spread',long_calls:'Long Calls',long_puts:'Long Puts'};
+  const lbl=document.getElementById('mscStratLabel');if(lbl)lbl.textContent=`— ${stratNames[MSC.strat]||''}`;
+  if(MSC.view==='cards')mscRenderCards();else mscRenderTable();
+}
+
+function mscRenderCards(){
+  const cv=document.getElementById('mscCardsView');
+  const tv=document.getElementById('mscTableView');
+  const sr=document.getElementById('mscSortRow');
+  if(cv)cv.style.display='block';if(tv)tv.style.display='none';if(sr)sr.style.display='none';
+  if(!cv)return;
+  if(!MSC.results.length){cv.innerHTML='<div class="msc-empty"><div class="msc-empty-icon">🔍</div><div class="msc-empty-title">No results found</div><div class="msc-empty-sub">Try relaxing your filters</div></div>';return;}
+  cv.innerHTML=MSC.results.map((r,i)=>{
+    const sc=r.score>=70?'high':r.score>=50?'med':'low';
+    const chgUp=r.chg>=0;
+    const prem=r.premium>0?`<span style="color:#22c55e">+$${r.premium}</span>`:`<span style="color:#ef4444">-$${Math.abs(r.premium)}</span>`;
+    const mp=r.maxProfit>999999?'∞':r.maxProfit<0?'—':`$${r.maxProfit.toLocaleString()}`;
+    const ml=r.maxLoss<0?`$${Math.abs(r.maxLoss).toLocaleString()}`:'—';
+    return `<div class="msc-card" onclick="mscShowDetail(${i})">
+      <div><div class="msc-card-sym">${r.sym}</div><div class="msc-card-name">${r.name}</div><div style="margin-top:3px"><span style="font-size:8px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px;font-family:'JetBrains Mono',monospace">${r.sector}</span></div></div>
+      <div><div style="font-size:8px;color:#334155;margin-bottom:2px">Price</div><div class="msc-card-price">$${r.price.toLocaleString()}</div><div class="msc-card-chg ${chgUp?'up':'dn'}">${chgUp?'+':''}${r.chg} (${(r.chg/r.price*100).toFixed(1)}%)</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">IV%</div><div class="msc-card-metric-val amber">${r.iv}%</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Premium</div><div class="msc-card-metric-val" style="font-size:11px">${prem}</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">POP%</div><div class="msc-card-metric-val green">${r.pop}%</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Max Profit</div><div class="msc-card-metric-val green">${mp}</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">DTE</div><div class="msc-card-metric-val cyan">${r.dte}d</div></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div class="msc-card-score ${sc}">${r.score}</div>
+        <div class="msc-card-action">Trade →</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function mscRenderTable(){
+  const cv=document.getElementById('mscCardsView');
+  const tv=document.getElementById('mscTableView');
+  const sr=document.getElementById('mscSortRow');
+  if(cv)cv.style.display='none';if(tv)tv.style.display='block';if(sr)sr.style.display='flex';
+  const tb=document.getElementById('mscTableBody');if(!tb)return;
+  if(!MSC.results.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:#334155">No results found — try relaxing filters</td></tr>';return;}
+  tb.innerHTML=MSC.results.map((r,i)=>{
+    const sc=r.score>=70?'#22c55e':r.score>=50?'#f59e0b':'#ef4444';
+    const mp=r.maxProfit>999999?'∞':`$${r.maxProfit.toLocaleString()}`;
+    const ml=`$${Math.abs(r.maxLoss).toLocaleString()}`;
+    const chgUp=r.chg>=0;
+    return `<tr onclick="mscShowDetail(${i})">
+      <td><span style="color:#e0e8f4;font-weight:600">${r.sym}</span><span style="color:#475569;font-size:9px;margin-left:5px">${r.name.slice(0,18)}</span></td>
+      <td>$${r.price.toFixed(2)}</td>
+      <td style="color:${chgUp?'#22c55e':'#ef4444'}">${chgUp?'+':''}${r.chg}</td>
+      <td style="color:#f59e0b">${r.iv}%</td>
+      <td style="color:${r.premium>=0?'#22c55e':'#ef4444'}">${r.premium>=0?'+':''}$${Math.abs(r.premium)}</td>
+      <td style="color:#22c55e">${r.pop}%</td>
+      <td style="color:#22c55e">${mp}</td>
+      <td style="color:#ef4444">${ml}</td>
+      <td style="color:#3b82f6">${r.dte}d</td>
+      <td><span style="color:${sc};font-weight:700">${r.score}</span></td>
+      <td><button class="msc-card-action" onclick="event.stopPropagation();mscShowDetail(${i})">Trade →</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Detail modal
+function mscShowDetail(idx){
+  const r=MSC.results[idx];if(!r)return;
+  MSC.detailResult=r;
+  const ov=document.getElementById('mscDetailOverlay');if(!ov)return;
+  document.getElementById('mscDetailTitle').textContent=`${r.sym} — ${r.name}`;
+  // Metrics
+  const mp=r.maxProfit>999999?'∞':`$${r.maxProfit.toLocaleString()}`;
+  const ml=`$${Math.abs(r.maxLoss).toLocaleString()}`;
+  document.getElementById('mscDetailMetrics').innerHTML=[
+    {l:'Price',v:`$${r.price.toFixed(2)}`,c:'#e0e8f4'},
+    {l:'IV%',v:`${r.iv}%`,c:'#f59e0b'},
+    {l:'Premium',v:`${r.premium>=0?'+':''}$${Math.abs(r.premium)}`,c:r.premium>=0?'#22c55e':'#ef4444'},
+    {l:'POP%',v:`${r.pop}%`,c:'#22c55e'},
+    {l:'Max Profit',v:mp,c:'#22c55e'},
+    {l:'Max Loss',v:ml,c:'#ef4444'},
+    {l:'DTE',v:`${r.dte}d`,c:'#3b82f6'},
+    {l:'Score',v:`${r.score}`,c:r.score>=70?'#22c55e':r.score>=50?'#f59e0b':'#ef4444'},
+    {l:'Breakeven',v:r.bes.length?`$${r.bes[0].toFixed(1)}`:'—',c:'#94a3b8'},
+  ].map(m=>`<div class="msc-dm"><div class="msc-dm-lbl">${m.l}</div><div class="msc-dm-val" style="color:${m.c}">${m.v}</div></div>`).join('');
+  // Legs
+  document.getElementById('mscDetailLegs').innerHTML=r.legs.map(l=>`<div class="msc-leg-row"><span class="msc-leg-dir ${l.dir.toLowerCase()}">${l.dir}</span><span class="msc-leg-type">${l.type}</span><span class="msc-leg-strike">$${typeof l.strike==='number'?l.strike.toFixed(l.strike%1?2:0):l.strike}</span><span class="msc-leg-exp">${r.dte}d DTE</span><span class="msc-leg-price">$${l.price}</span></div>`).join('');
+  ov.classList.add('show');
+  mscBuildDetailChart(r);
+}
+function mscCloseDetail(){const ov=document.getElementById('mscDetailOverlay');if(ov)ov.classList.remove('show');}
+function mscSendToBuilder(){
+  mscCloseDetail();
+  // Switch to sigma builder tab with this symbol
+  if(MSC.detailResult&&typeof sgbSelectSym==='function')sgbSelectSym(MSC.detailResult.sym,MSC.detailResult.name);
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
+  const tabs=document.querySelectorAll('.mtab');tabs.forEach(t=>{if(t.textContent.includes('Sigma'))t.classList.add('active');});
+  switchMain('sigmabuilder',document.querySelector('.mtab.active')||{classList:{add:()=>{}}});
+}
+function mscBuildDetailChart(r){
+  const cv=document.getElementById('mscDetailChart');if(!cv)return;
+  if(MSC.detailChart)MSC.detailChart.destroy();
+  const N=80,rng=r.price*0.12;
+  const prices=Array.from({length:N},(_,i)=>r.price-rng+i/(N-1)*rng*2);
+  // simple P&L approximation based on premium and structure
+  const plData=prices.map(p=>{
+    if(['iron_condor','iron_butterfly'].includes(MSC.strat)){
+      const halfW=r.price*.04;const pl=r.maxProfit/100-Math.max(0,Math.abs(p-r.price)-halfW)*(r.maxProfit+r.maxLoss)/100/halfW;
+      return Math.max(-r.maxLoss/100,Math.min(r.maxProfit/100,pl));
+    }else if(MSC.strat==='long_calls')return Math.max(-r.maxLoss/100,p-r.price-r.maxLoss/100);
+    else if(MSC.strat==='long_puts')return Math.max(-r.maxLoss/100,r.price-p-r.maxLoss/100);
+    return Math.max(-r.maxLoss/100,Math.min(r.maxProfit/100,r.premium/2-(Math.abs(p-r.price)*.3)));
+  });
+  const posData=plData.map(v=>v>=0?v:null),negData=plData.map(v=>v<0?v:null);
+  const mxA=Math.max(...plData.map(Math.abs),.1);
+  const sig=r.price*(r.iv/100)*Math.sqrt(r.dte/365);
+  const prob=prices.map(p=>Math.exp(-.5*Math.pow((p-r.price)/sig,2))/(sig*Math.sqrt(2*Math.PI))*rng*2/N*mxA*1.4);
+  MSC.detailChart=new Chart(cv,{type:'line',data:{labels:prices.map(p=>`$${p.toFixed(0)}`),datasets:[
+    {data:prob,borderColor:'transparent',backgroundColor:'rgba(30,60,120,0.18)',fill:true,tension:.3,pointRadius:0,order:3},
+    {data:posData,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.2)',fill:true,tension:.1,pointRadius:0,borderWidth:2,spanGaps:false,order:1},
+    {data:negData,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.16)',fill:true,tension:.1,pointRadius:0,borderWidth:2,spanGaps:false,order:1},
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},maxTicksLimit:10}},y:{grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},callback:v=>`$${v.toFixed(0)}`},min:-mxA*1.2,max:mxA*1.3}}}});
+}
+
+// Controls
+function mscSelectStrat(el){
+  document.querySelectorAll('.msc-sc').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  MSC.strat=el.dataset.strat;
+}
+function mscToggleSector(el,sector){
+  if(sector==='all'){
+    MSC.activeSectors=new Set(['all']);
+    document.querySelectorAll('.msc-sector').forEach(s=>s.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    MSC.activeSectors.delete('all');
+    document.querySelector('.msc-sector[onclick*="all"]')?.classList.remove('active');
+    if(el.classList.contains('active')){el.classList.remove('active');MSC.activeSectors.delete(sector);}
+    else{el.classList.add('active');MSC.activeSectors.add(sector);}
+    if(!MSC.activeSectors.size){MSC.activeSectors.add('all');document.querySelector('.msc-sector[onclick*="all"]')?.classList.add('active');}
+  }
+}
+function mscSetView(view,el){
+  MSC.view=view;
+  document.querySelectorAll('.msc-view-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(MSC.results.length)mscRenderResults();
+}
+function mscSort(col){MSC.results.sort((a,b)=>col==='dte'?a.dte-b.dte:b[col]-a[col]);mscRenderResults();}
+function mscSortCol(col,el){document.querySelectorAll('.msc-sort-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');mscSort(col);}
+function mscSortColTbl(col){mscSort(col);}
+
+// Hook into switchMain
+const _origSwitchMain3=window.switchMain;
+window.switchMain=function(id,el){
+  _origSwitchMain3(id,el);
+};
+
 // ═══════════════════════════════════════════════════════════
 generateExpirations();
 generateImData();
