@@ -314,6 +314,7 @@ html,body{background:#0A0A0F;color:#E0E0E8;font-family:'Inter',sans-serif;min-he
   <div class="mtab" onclick="switchMain('intervalmap',this)">Interval Map</div>
   <div class="mtab" onclick="switchMain('predictions',this)">◉ Predictions</div>
   <div class="mtab" onclick="switchMain('builder',this)">⚙ Strategy Builder</div>
+  <div class="mtab" onclick="switchMain('sigmabuilder',this)">◈ Sigma Builder</div>
 </div>
 
 <!-- sub tabs -->
@@ -821,6 +822,462 @@ input[type=range].sb-sl{width:100%;accent-color:#3b82f6;height:3px}
     </div>
   </div>
 </div>
+
+<!-- ── SIGMA BUILDER PANEL ─────────────────────────────────── -->
+<div class="panel" id="panel-sigmabuilder" style="padding:0">
+<style>
+#sgb{background:#0d1520;color:#c8d4e0;font-family:'Inter',sans-serif;position:relative;min-height:600px}
+#sgb *{box-sizing:border-box}
+/* TOP TICKER BAR */
+.sgb-ticker-bar{background:#0a1018;border-bottom:1px solid #1a2535;padding:6px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sgb-ticker-info{display:flex;align-items:center;gap:8px}
+.sgb-ticker-logo{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0}
+.sgb-ticker-name{font-size:12px;font-weight:600;color:#e0e8f0}
+.sgb-ticker-price{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#e0e8f0}
+.sgb-ticker-chg{font-family:'JetBrains Mono',monospace;font-size:10px}
+.sgb-ticker-chg.up{color:#22c55e}.sgb-ticker-chg.dn{color:#ef4444}
+.sgb-ticker-tabs{display:flex;gap:0;border-bottom:0;margin-left:8px}
+.sgb-ttab{padding:4px 10px;font-size:10px;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.sgb-ttab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.sgb-ticker-search{position:relative;margin-left:auto}
+.sgb-search-in{background:#111d2d;border:1px solid #1e3a5a;border-radius:4px;color:#c8d4e0;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;width:140px}
+.sgb-search-in:focus{outline:none;border-color:#3b82f699}
+.sgb-sdrop{position:absolute;top:100%;right:0;width:220px;background:#111820;border:1px solid #1e2a3a;border-radius:6px;z-index:200;max-height:200px;overflow-y:auto;display:none}
+.sgb-sdrop.open{display:block}
+.sgb-sdi{padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #131d2a}
+.sgb-sdi:hover{background:#1a2535}
+.sgb-sds{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#3b82f6;min-width:44px}
+.sgb-sdn{font-size:9px;color:#475569;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* MINI TICKER TAPE */
+.sgb-tape{background:#0a1018;border-bottom:1px solid #1a2535;padding:4px 14px;display:flex;gap:14px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:10px}
+.sgb-tape::-webkit-scrollbar{height:2px}
+.sgb-tape-item{display:flex;align-items:center;gap:4px;flex-shrink:0;color:#475569}
+.sgb-tape-item b{color:#94a3b8}
+.sgb-tape-item .up{color:#22c55e}.sgb-tape-item .dn{color:#ef4444}
+/* STRATEGY CONTROLS */
+.sgb-controls{background:#111820;border-bottom:1px solid #1a2535;padding:7px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sgb-strat-sel{background:#1a2a3a;border:1.5px solid #3b82f655;border-radius:5px;color:#3b82f6;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.sgb-strat-dropdown{position:relative}
+.sgb-strat-menu{position:absolute;top:calc(100%+3px);left:0;width:200px;background:#111820;border:1px solid #1e2a3a;border-radius:6px;z-index:300;display:none;box-shadow:0 8px 24px rgba(0,0,0,.8)}
+.sgb-strat-menu.show{display:block}
+.sgb-sm-cat{font-size:8px;color:#334155;padding:5px 10px 2px;text-transform:uppercase;letter-spacing:.07em}
+.sgb-sm-item{padding:6px 10px;cursor:pointer;font-size:10px;color:#64748b;font-family:'JetBrains Mono',monospace}
+.sgb-sm-item:hover{background:#1a2535;color:#e0e8f0}
+.sgb-sm-item.c{color:#22c55e77}.sgb-sm-item.c:hover{color:#22c55e}
+.sgb-sm-item.p{color:#ef444477}.sgb-sm-item.p:hover{color:#ef4444}
+.sgb-sm-item.n{color:#3b82f677}.sgb-sm-item.n:hover{color:#3b82f6}
+.sgb-legs-btn{background:#22c55e18;border:1px solid #22c55e44;border-radius:4px;color:#22c55e;font-size:10px;padding:4px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.sgb-legs-btn:hover{background:#22c55e28}
+.sgb-legs-drop{position:relative}
+.sgb-legs-menu{position:absolute;top:calc(100%+3px);left:0;width:160px;background:#111820;border:1px solid #1e2a3a;border-radius:6px;z-index:300;display:none;box-shadow:0 8px 24px rgba(0,0,0,.8)}
+.sgb-legs-menu.show{display:block}
+.sgb-lm-item{padding:7px 12px;cursor:pointer;font-size:10px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:8px;border-bottom:1px solid #131d2a}
+.sgb-lm-item:last-child{border-bottom:none}
+.sgb-lm-item:hover{background:#1a2535}
+.sgb-place-btn{background:#3b82f6;border:none;border-radius:4px;color:#fff;font-size:10px;font-weight:600;padding:5px 14px;cursor:pointer;margin-left:auto;white-space:nowrap}
+.sgb-place-btn:hover{background:#2563eb}
+.sgb-save-icon{color:#64748b;cursor:pointer;font-size:14px;padding:3px 5px}
+.sgb-save-icon:hover{color:#3b82f6}
+/* EXPIRATION BAR */
+.sgb-exp-bar{background:#0d1520;border-bottom:1px solid #1a2535;padding:5px 14px;display:flex;align-items:center;gap:0;overflow-x:auto}
+.sgb-exp-bar::-webkit-scrollbar{height:2px}
+.sgb-exp-lbl{font-size:8px;color:#334155;font-family:'JetBrains Mono',monospace;flex-shrink:0;margin-right:6px}
+.sgb-exp-month{font-size:8px;color:#3b82f699;font-family:'JetBrains Mono',monospace;padding:0 4px;flex-shrink:0;font-weight:600}
+.sgb-exp-btn{background:transparent;border:none;color:#475569;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0;border-radius:3px;position:relative}
+.sgb-exp-btn:hover{color:#94a3b8;background:#1a2535}
+.sgb-exp-btn.active{background:#3b82f6;color:#fff;font-weight:600}
+.sgb-exp-btn.earnings::after{content:'E';position:absolute;top:0;right:0;font-size:6px;color:#f59e0b;background:#1a0f00;border-radius:2px;padding:0 2px}
+/* STRIKE RULER */
+.sgb-ruler-sec{background:#111820;border-bottom:1px solid #1a2535;padding:4px 0 0;user-select:none}
+.sgb-buy-sell-labels{display:flex;flex-direction:column;position:absolute;left:6px;z-index:5;pointer-events:none}
+.sgb-bs-buy{font-size:11px;font-weight:700;color:#22c55e;line-height:1}
+.sgb-bs-sell{font-size:11px;font-weight:700;color:#ef4444;line-height:1;margin-top:28px}
+.sgb-ruler-outer{position:relative;height:80px;overflow:hidden;cursor:grab}
+.sgb-ruler-outer:active{cursor:grabbing}
+.sgb-ruler-ll{position:absolute;inset:0;pointer-events:none}
+.sgb-lh{position:absolute;transform:translateX(-50%);pointer-events:all;cursor:ew-resize;z-index:10;display:flex;flex-direction:column;align-items:center}
+.sgb-lp{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;line-height:1.4;cursor:ew-resize;position:relative}
+.sgb-lp.c{background:#22c55e;color:#fff}
+.sgb-lp.p{background:#ef4444;color:#fff}
+.sgb-lp .qty-badge{position:absolute;top:-4px;right:-4px;background:#3b82f6;color:#fff;font-size:7px;width:12px;height:12px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.sgb-lsm{width:1px;background:#334155;flex-shrink:0}
+.sgb-ldt{width:7px;height:7px;border-radius:50%;border:2px solid;flex-shrink:0}
+.sgb-ldt.c{border-color:#22c55e;background:#22c55e44}
+.sgb-ldt.p{border-color:#ef4444;background:#ef444444}
+/* METRICS ROWS */
+.sgb-metrics-wrap{display:flex;background:#0a1018;border-bottom:1px solid #1a2535;flex-wrap:nowrap;overflow-x:auto}
+.sgb-metrics-wrap::-webkit-scrollbar{height:2px}
+.sgb-m-section{display:flex;border-right:1px solid #1a2535;flex-shrink:0}
+.sgb-m-section:last-child{border-right:none}
+.sgb-m-title{font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.06em;padding:4px 12px 0;width:100%;text-align:center}
+.sgb-m-items{display:flex}
+.sgb-mi{padding:3px 10px 6px;min-width:70px;text-align:center;border-right:1px solid #1a2535}
+.sgb-mi:last-child{border-right:none}
+.sgb-mi-lbl{font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.sgb-mi-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600}
+.sgb-mi-val.green{color:#22c55e}.sgb-mi-val.red{color:#ef4444}.sgb-mi-val.cyan{color:#3b82f6}.sgb-mi-val.amber{color:#f59e0b}.sgb-mi-val.white{color:#c8d4e0}.sgb-mi-val.inf{color:#22c55e;font-size:11px}
+.sgb-nq-bid{color:#3b82f6}.sgb-nq-ask{color:#ef4444}
+/* CHART */
+.sgb-chart-outer{position:relative;background:#0d1520;padding:8px 12px 4px}
+.sgb-chart-wrap{position:relative;width:100%;height:240px}
+#sgbPlChart{cursor:crosshair}
+.sgb-chart-tooltip{position:absolute;background:#111820ee;border:1px solid #2a3a4a;border-radius:5px;padding:6px 9px;pointer-events:none;display:none;z-index:50;font-family:'JetBrains Mono',monospace;font-size:9px;box-shadow:0 4px 16px rgba(0,0,0,.6);min-width:110px}
+.sgb-ct-price{color:#64748b;margin-bottom:2px;font-size:8px}
+.sgb-ct-pl{font-size:13px;font-weight:700;margin-bottom:2px}
+.sgb-ct-pl.pos{color:#22c55e}.sgb-ct-pl.neg{color:#ef4444}
+.sgb-ct-time{color:#334155;font-size:8px}
+/* DATE + SLIDERS */
+.sgb-sl-sec{background:#0d1520;border-top:1px solid #1a2535;border-bottom:1px solid #1a2535;padding:4px 12px 6px}
+.sgb-date-row{display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:8px;color:#334155;margin-bottom:2px}
+.sgb-date-val{color:#94a3b8}
+.sgb-at-exp{color:#475569}
+input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
+.sgb-sliders-row{display:flex;gap:0;border-top:1px solid #1a2535;margin-top:4px}
+.sgb-slw{flex:1;padding:4px 10px 6px;border-right:1px solid #1a2535}
+.sgb-slw:last-child{border-right:none}
+.sgb-sl-lbl{font-size:8px;color:#334155;font-family:'JetBrains Mono',monospace;display:flex;justify-content:space-between;margin-bottom:3px}
+.sgb-sl-lbl span{color:#94a3b8}
+/* BOTTOM TABS */
+.sgb-bot-tabs{display:flex;background:#111820;border-bottom:1px solid #1a2535;overflow-x:auto}
+.sgb-bot-tabs::-webkit-scrollbar{height:2px}
+.sgb-btab{padding:6px 14px;font-size:10px;color:#475569;cursor:pointer;border:1px solid #1a2535;border-radius:4px;margin:5px 3px;white-space:nowrap}
+.sgb-btab:hover{color:#94a3b8;border-color:#334155}
+.sgb-btab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+/* TABLE */
+.sgb-tc{padding:8px 12px;background:#0d1520;display:none}
+.sgb-tc.show{display:block}
+.sgb-tbl{width:100%;border-collapse:collapse;font-size:9px}
+.sgb-tbl th{padding:4px 8px;color:#334155;font-weight:500;text-align:right;border-bottom:1px solid #131d2a;font-size:7px;text-transform:uppercase}
+.sgb-tbl th:first-child{text-align:left}
+.sgb-tbl td{padding:4px 8px;color:#475569;border-bottom:1px solid #0a1018;font-family:'JetBrains Mono',monospace;font-size:9px;text-align:right}
+.sgb-tbl td:first-child{text-align:left;color:#64748b}
+.sgb-tbl tr.cur td{background:#3b82f60a;color:#3b82f6}
+/* GREEKS SELECTOR */
+.sgb-greeks-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px}
+.sgb-gk-card{background:#111820;border:1px solid #1a2535;border-radius:6px;padding:10px;cursor:pointer;transition:all .12s}
+.sgb-gk-card:hover{border-color:#3b82f655}
+.sgb-gk-card.selected{border-color:#3b82f6;background:#3b82f60a}
+.sgb-gk-icon{font-size:14px;margin-bottom:4px}
+.sgb-gk-name{font-size:9px;color:#64748b;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em}
+.sgb-gk-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600}
+/* HISTORICAL PERFORMANCE */
+.sgb-hist-wrap{background:#0a1018;border-top:1px solid #1a2535;padding:10px 12px}
+.sgb-hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sgb-hist-title{font-size:10px;color:#64748b;display:flex;align-items:center;gap:5px}
+.sgb-hist-icon{font-size:11px}
+.sgb-hist-period{display:flex;gap:4px}
+.sgb-period-btn{background:transparent;border:1px solid #1a2535;border-radius:3px;color:#475569;font-size:8px;padding:2px 7px;cursor:pointer;font-family:'JetBrains Mono',monospace}
+.sgb-period-btn:hover{color:#94a3b8}
+.sgb-period-btn.active{background:#3b82f618;border-color:#3b82f655;color:#3b82f6}
+.sgb-hist-chart-wrap{position:relative;height:160px}
+.sgb-hist-legend{display:flex;gap:14px;margin-top:5px}
+.sgb-hist-leg{display:flex;align-items:center;gap:5px;font-size:8px;color:#475569;font-family:'JetBrains Mono',monospace}
+.sgb-hist-leg-dot{width:16px;height:2px;border-radius:1px}
+/* POPUP */
+.sgb-pop{position:absolute;background:#111820;border:1px solid #2a3a4a;border-radius:8px;z-index:400;width:240px;font-family:'JetBrains Mono',monospace;font-size:9px;box-shadow:0 8px 30px rgba(0,0,0,.9);display:none}
+.sgb-pop.show{display:block}
+.sgb-pop-hdr{padding:8px 10px;border-bottom:1px solid #1a2535;font-size:10px;font-weight:600;color:#e0e8f0;display:flex;align-items:center;justify-content:space-between}
+.sgb-pop-x{color:#334155;cursor:pointer;font-size:14px}.sgb-pop-x:hover{color:#e0e8f0}
+.sgb-pop-qty{padding:7px 10px;border-bottom:1px solid #1a2535;display:flex;align-items:center;justify-content:space-between}
+.sgb-qbtn{width:18px;height:18px;border-radius:3px;background:#1a2535;border:1px solid #2a3a4a;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px}
+.sgb-qbtn:hover{color:#e0e8f0;background:#2a3a4a}
+.sgb-qv{font-size:11px;font-weight:600;color:#e0e8f0;min-width:14px;text-align:center}
+.sgb-pop-data{padding:7px 10px;border-bottom:1px solid #1a2535;display:grid;grid-template-columns:1fr 1fr;gap:3px 0}
+.sgb-pd{display:flex;justify-content:space-between;padding:1px 0}
+.sgb-pdl{color:#334155}.sgb-pdv{color:#64748b}
+.sgb-pdv.g{color:#22c55e}.sgb-pdv.r{color:#ef4444}.sgb-pdv.a{color:#f59e0b}
+.sgb-pop-sep{height:1px;background:#1a2535;margin:2px 0}
+.sgb-pop-acts{padding:3px 0}
+.sgb-pact{padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;color:#475569;font-size:9px}
+.sgb-pact:hover{background:#1a2535;color:#e0e8f0}
+.sgb-pact.danger{color:#ef444466}.sgb-pact.danger:hover{background:#1a0808;color:#ef4444}
+/* SAVE MODAL */
+.sgb-save-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:none;align-items:center;justify-content:center}
+.sgb-save-modal.show{display:flex}
+.sgb-modal{background:#111d2d;border:1px solid #1e3a5a;border-radius:10px;padding:24px;width:480px;max-width:95vw}
+.sgb-modal-title{font-size:17px;font-weight:600;color:#e0e8f0;margin-bottom:16px;display:flex;justify-content:space-between}
+.sgb-modal-x{color:#475569;cursor:pointer;font-size:18px}.sgb-modal-x:hover{color:#e0e8f0}
+.sgb-modal-field{margin-bottom:12px}
+.sgb-modal-label{font-size:11px;color:#94a3b8;margin-bottom:5px;display:flex;gap:5px}
+.sgb-modal-label .opt{color:#3b82f6}
+.sgb-modal-input{width:100%;background:#0d1117;border:1px solid #1e3a5a;border-radius:5px;color:#e0e8f0;font-size:12px;padding:7px 10px}
+.sgb-modal-input:focus{outline:none;border-color:#3b82f699}
+.sgb-modal-textarea{width:100%;background:#0d1117;border:1px solid #1e3a5a;border-radius:5px;color:#e0e8f0;font-size:12px;padding:7px 10px;resize:vertical;min-height:75px}
+.sgb-modal-textarea:focus{outline:none;border-color:#3b82f699}
+.sgb-modal-textarea::placeholder{color:#334155}
+.sgb-modal-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.sgb-modal-sel{background:#0d1117;border:1px solid #1e3a5a;border-radius:5px;color:#e0e8f0;font-size:12px;padding:6px 9px;cursor:pointer;flex:1}
+.sgb-modal-sel:focus{outline:none;border-color:#3b82f699}
+.sgb-new-grp-btn{background:transparent;border:1px solid #1e3a5a;border-radius:5px;color:#3b82f6;font-size:10px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.sgb-new-grp-btn:hover{background:#1e3a5a22}
+.sgb-modal-save{background:#3b82f6;border:none;border-radius:5px;color:#fff;font-size:13px;font-weight:600;padding:9px;cursor:pointer;width:100%}
+.sgb-modal-save:hover{background:#2563eb}
+.sgb-pos-menu{position:absolute;top:calc(100%+4px);right:0;background:#111820;border:1px solid #1a2535;border-radius:8px;z-index:400;width:300px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.8);max-height:280px;overflow-y:auto}
+.sgb-pos-menu.show{display:block}
+.sgb-pos-hdr{padding:7px 12px;border-bottom:1px solid #1a2535;font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace;display:flex;justify-content:space-between}
+.sgb-pos-empty{padding:18px;text-align:center;font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace}
+.sgb-saved-item{background:#0a1018;border-bottom:1px solid #1a2535;padding:7px 12px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.sgb-saved-item:hover{background:#111820}
+.sgb-si-del{color:#334155;cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0}.sgb-si-del:hover{color:#ef4444}
+</style>
+
+<div id="sgb">
+  <!-- TICKER BAR -->
+  <div class="sgb-ticker-bar">
+    <div class="sgb-ticker-info">
+      <div class="sgb-ticker-logo" id="sgbTickerLogo">T</div>
+      <div>
+        <div class="sgb-ticker-name" id="sgbTickerName">Tesla, Inc.</div>
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span class="sgb-ticker-price" id="sgbTickerPrice">$407.12</span>
+          <span class="sgb-ticker-chg up" id="sgbTickerChg">+0.69 (0.17%)</span>
+        </div>
+      </div>
+    </div>
+    <div class="sgb-ticker-tabs">
+      <span class="sgb-ttab">Stock</span>
+      <span class="sgb-ttab active">Option Strategies</span>
+      <span class="sgb-ttab">Chains</span>
+      <span class="sgb-ttab">Fundamentals</span>
+    </div>
+    <div class="sgb-ticker-search" style="position:relative">
+      <input class="sgb-search-in" id="sgbSearchIn" placeholder="Search Symbol..." autocomplete="off"
+        oninput="sgbOnSearch(this.value)" onfocus="sgbShowDrop()" onblur="setTimeout(sgbHideDrop,200)">
+      <div class="sgb-sdrop" id="sgbSearchDrop">
+        <div style="padding:8px 10px;font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace">Cargando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MINI TAPE -->
+  <div class="sgb-tape" id="sgbTape">
+    <div class="sgb-tape-item"><b>MSFT</b> 390.74 <span class="up">+0.48%</span></div>
+    <div class="sgb-tape-item"><b>AMZN</b> 238.55 <span class="dn">-1.93%</span></div>
+    <div class="sgb-tape-item"><b>GOOGL</b> 359.68 <span class="up">+1.91%</span></div>
+    <div class="sgb-tape-item"><b>TSLA</b> 406.43 <span class="up">+0.74%</span></div>
+    <div class="sgb-tape-item"><b>META</b> 566.98 <span class="dn">-1.45%</span></div>
+    <div class="sgb-tape-item"><b>NVDA</b> 205.19 <span class="dn">-0.32%</span></div>
+    <div class="sgb-tape-item"><b>JPM</b> 320.72 <span class="up">+7.23%</span></div>
+    <div class="sgb-tape-item"><b>SPY</b> 741.75 <span class="dn">-0.13%</span></div>
+  </div>
+
+  <!-- STRATEGY CONTROLS -->
+  <div class="sgb-controls">
+    <div class="sgb-strat-dropdown" style="position:relative">
+      <div class="sgb-strat-sel" onclick="sgbToggleStratMenu(event)">
+        <span style="color:#22c55e;font-size:10px">LONG</span>
+        <span id="sgbStratLabel">CALL</span>
+        <span style="font-size:10px">▾</span>
+      </div>
+      <div class="sgb-strat-menu" id="sgbStratMenu">
+        <div class="sgb-sm-cat">Basic</div>
+        <div class="sgb-sm-item c" onclick="sgbSelStrat('long_call','LONG CALL','LONG','CALL')">Long Call</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('long_put','LONG PUT','LONG','PUT')">Long Put</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('short_call','SHORT CALL','SHORT','CALL')">Short Call</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('short_put','SHORT PUT','SHORT','PUT')">Short Put</div>
+        <div class="sgb-sm-cat">Spreads</div>
+        <div class="sgb-sm-item c" onclick="sgbSelStrat('bull_call_spread','BULL CALL SPREAD','BULL','CALL')">Bull Call Spread</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('bear_put_spread','BEAR PUT SPREAD','BEAR','PUT')">Bear Put Spread</div>
+        <div class="sgb-sm-item c" onclick="sgbSelStrat('bull_put_spread','BULL PUT SPREAD','BULL','PUT')">Bull Put Spread</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('bear_call_spread','BEAR CALL SPREAD','BEAR','CALL')">Bear Call Spread</div>
+        <div class="sgb-sm-cat">Neutral</div>
+        <div class="sgb-sm-item n" onclick="sgbSelStrat('iron_butterfly','IRON BUTTERFLY','NEUTRAL','CALL+PUT')">Iron Butterfly</div>
+        <div class="sgb-sm-item n" onclick="sgbSelStrat('iron_condor','IRON CONDOR','NEUTRAL','CALL+PUT')">Iron Condor</div>
+        <div class="sgb-sm-item n" onclick="sgbSelStrat('straddle','STRADDLE','NEUTRAL','CALL+PUT')">Straddle</div>
+        <div class="sgb-sm-item n" onclick="sgbSelStrat('strangle','STRANGLE','NEUTRAL','CALL+PUT')">Strangle</div>
+        <div class="sgb-sm-cat">Income</div>
+        <div class="sgb-sm-item c" onclick="sgbSelStrat('covered_call','COVERED CALL','COVERED','CALL')">Covered Call</div>
+        <div class="sgb-sm-item p" onclick="sgbSelStrat('cash_secured_put','CASH-SECURED PUT','CASH','PUT')">Cash-Secured Put</div>
+      </div>
+    </div>
+    <span style="color:#334155;font-size:16px">→</span>
+    <div class="sgb-legs-dropdown" style="position:relative">
+      <button class="sgb-legs-btn" onclick="sgbToggleLegsMenu(event)">+ Legs ▾</button>
+      <div class="sgb-legs-menu" id="sgbLegsMenu">
+        <div class="sgb-lm-item" onclick="sgbAddLeg('C',true)"><span style="color:#22c55e;font-size:8px;font-family:'JetBrains Mono',monospace;font-weight:700;background:#22c55e18;border:1px solid #22c55e44;border-radius:2px;padding:1px 5px">BUY</span> Call</div>
+        <div class="sgb-lm-item" onclick="sgbAddLeg('C',false)"><span style="color:#ef4444;font-size:8px;font-family:'JetBrains Mono',monospace;font-weight:700;background:#ef444418;border:1px solid #ef444444;border-radius:2px;padding:1px 5px">SELL</span> Call</div>
+        <div class="sgb-lm-item" onclick="sgbAddLeg('P',true)"><span style="color:#22c55e;font-size:8px;font-family:'JetBrains Mono',monospace;font-weight:700;background:#22c55e18;border:1px solid #22c55e44;border-radius:2px;padding:1px 5px">BUY</span> Put</div>
+        <div class="sgb-lm-item" onclick="sgbAddLeg('P',false)"><span style="color:#ef4444;font-size:8px;font-family:'JetBrains Mono',monospace;font-weight:700;background:#ef444418;border:1px solid #ef444444;border-radius:2px;padding:1px 5px">SELL</span> Put</div>
+      </div>
+    </div>
+    <span style="color:#475569;font-size:10px;font-family:'JetBrains Mono',monospace" id="sgbLegSum"></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;position:relative">
+      <button class="sgb-legs-btn" style="background:#3b82f618;border-color:#3b82f644;color:#3b82f6" onclick="sgbTogglePosMenu(event)">Positions (<span id="sgbPosCount">0</span>) ☰</button>
+      <div class="sgb-pos-menu" id="sgbPosMenu">
+        <div class="sgb-pos-hdr"><span>Estrategias Guardadas</span><span id="sgbPosMenuCount" style="color:#3b82f6">0</span></div>
+        <div id="sgbPosMenuList"><div class="sgb-pos-empty">Sin estrategias guardadas</div></div>
+      </div>
+      <button class="sgb-place-btn" onclick="sgbOpenSave()">Save Trade ⊡</button>
+    </div>
+  </div>
+
+  <!-- EXPIRATIONS -->
+  <div class="sgb-exp-bar">
+    <span class="sgb-exp-lbl">EXPIRATIONS: <span id="sgbDteL" style="color:#3b82f6">2d</span></span>
+    <span class="sgb-exp-month">Jun</span>
+    <button class="sgb-exp-btn active" onclick="sgbSetExp(this,'Jun 15',2)">15</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 17',4)">17</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 18',5)">18</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 20',7)">20</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 22',9)">22</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 25',12)">25</button>
+    <button class="sgb-exp-btn earnings" onclick="sgbSetExp(this,'Jun 27',14)">27</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jun 30',17)">30</button>
+    <span class="sgb-exp-month">Jul</span>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jul 2',19)">02</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jul 10',27)">10</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jul 17',34)">17</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jul 24',41)">24</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jul 31',48)">31</button>
+    <span class="sgb-exp-month">Aug</span>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Aug 15',63)">15</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Sep 19',98)">Sep 19</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Dec 20',190)">Dec '26</button>
+    <button class="sgb-exp-btn" onclick="sgbSetExp(this,'Jan 15',216)">Jan '27</button>
+  </div>
+
+  <!-- RULER -->
+  <div class="sgb-ruler-sec">
+    <div style="position:relative">
+      <div class="sgb-buy-sell-labels" style="top:4px">
+        <span class="sgb-bs-buy">Buy</span>
+        <span class="sgb-bs-sell">Sell</span>
+      </div>
+      <div class="sgb-ruler-outer" id="sgbRulerWrap">
+        <canvas id="sgbRulerCanvas" style="display:block;width:100%;height:100%" role="img" aria-label="Strike selector"></canvas>
+        <div class="sgb-ruler-ll" id="sgbLegsLayer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- METRICS -->
+  <div class="sgb-metrics-wrap">
+    <!-- Debit/Loss/Profit -->
+    <div class="sgb-m-section" style="flex-direction:column">
+      <div class="sgb-m-title">DEBIT/LOSS/PROFIT</div>
+      <div class="sgb-m-items">
+        <div class="sgb-mi"><div class="sgb-mi-lbl">NET DEBIT</div><div class="sgb-mi-val red" id="sgbNetDebit">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">MAX LOSS</div><div class="sgb-mi-val red" id="sgbMaxLoss">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">MAX PROFIT</div><div class="sgb-mi-val green" id="sgbMaxProfit">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">BREAKEVEN</div><div class="sgb-mi-val cyan" id="sgbBe">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">POP</div><div class="sgb-mi-val white" id="sgbPop2">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">P50</div><div class="sgb-mi-val white" id="sgbP50">—</div></div>
+      </div>
+    </div>
+    <!-- Net Quote -->
+    <div class="sgb-m-section" style="flex-direction:column">
+      <div class="sgb-m-title">NET QUOTE</div>
+      <div class="sgb-m-items">
+        <div class="sgb-mi"><div class="sgb-mi-lbl">BID (NAT)</div><div class="sgb-mi-val sgb-nq-bid" id="sgbBid">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">MID</div><div class="sgb-mi-val white" id="sgbMid">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">ASK (OPP)</div><div class="sgb-mi-val sgb-nq-ask" id="sgbAsk">—</div></div>
+      </div>
+    </div>
+    <!-- Greeks -->
+    <div class="sgb-m-section" style="flex-direction:column">
+      <div class="sgb-m-title">GREEKS</div>
+      <div class="sgb-m-items">
+        <div class="sgb-mi"><div class="sgb-mi-lbl">Δ DELTA</div><div class="sgb-mi-val green" id="sgbDelta">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">Θ THETA</div><div class="sgb-mi-val red" id="sgbTheta">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">Γ GAMMA</div><div class="sgb-mi-val white" id="sgbGamma">—</div></div>
+        <div class="sgb-mi"><div class="sgb-mi-lbl">ν VEGA</div><div class="sgb-mi-val white" id="sgbVega">—</div></div>
+        <div class="sgb-mi" style="border-right:none"><div class="sgb-mi-lbl">ρ RHO</div><div class="sgb-mi-val white" id="sgbRho">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="sgb-chart-outer" id="sgbChartOuter">
+    <div class="sgb-chart-wrap">
+      <canvas id="sgbPlChart" role="img" aria-label="Grafica P&L interactiva"></canvas>
+    </div>
+    <div class="sgb-chart-tooltip" id="sgbTooltip">
+      <div class="sgb-ct-price" id="sgbTtPrice">$407</div>
+      <div class="sgb-ct-pl pos" id="sgbTtPl">$0.00</div>
+      <div class="sgb-ct-time" id="sgbTtTime">At expiration</div>
+    </div>
+  </div>
+
+  <!-- DATE + SLIDERS -->
+  <div class="sgb-sl-sec">
+    <div class="sgb-date-row">
+      <span>Date: <span class="sgb-date-val" id="sgbDateLabel">Mon Jun 15th 1:00pm (2d)</span></span>
+      <span class="sgb-at-exp" id="sgbAtExp">(At expiration)</span>
+    </div>
+    <input type="range" class="sgb-sl" id="sgbDateSlider" min="0" max="100" value="100" step="1" oninput="sgbOnDate(this.value)">
+    <div class="sgb-sliders-row">
+      <div class="sgb-slw">
+        <div class="sgb-sl-lbl">Range: <span id="sgbRangeV">5</span></div>
+        <input type="range" class="sgb-sl" id="sgbRangeSlider" min="1" max="20" value="5" step="1" oninput="sgbOnRange(this.value)">
+      </div>
+      <div class="sgb-slw">
+        <div class="sgb-sl-lbl">Implied Volatility: <span id="sgbIvV">53%</span></div>
+        <input type="range" class="sgb-sl" id="sgbIvSlider" min="5" max="200" value="53" step="1" oninput="sgbOnIV(this.value)" style="accent-color:#3b82f6">
+        <div style="display:flex;justify-content:flex-end;gap:20px;font-family:'JetBrains Mono',monospace;font-size:7px;color:#1a2535;margin-top:2px"><span>1x</span><span>2x</span><span>3x</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM TABS -->
+  <div class="sgb-bot-tabs">
+    <div class="sgb-btab active" onclick="sgbBotTab('chart',this)">📈 Chart</div>
+    <div class="sgb-btab" onclick="sgbBotTab('table',this)">☰ Table</div>
+    <div class="sgb-btab" onclick="sgbBotTab('pnl',this)">Profit/Loss</div>
+    <div class="sgb-btab" onclick="sgbBotTab('greeks',this)">Select Greeks</div>
+  </div>
+
+  <div class="sgb-tc" id="sgb-tc-table">
+    <table class="sgb-tbl"><thead><tr><th>Precio</th><th>At Exp</th><th>Ahora</th><th>Delta</th><th>Theta/día</th><th>Gamma</th></tr></thead><tbody id="sgbTblBody"></tbody></table>
+  </div>
+  <div class="sgb-tc" id="sgb-tc-pnl">
+    <table class="sgb-tbl"><thead><tr><th>Precio</th><th>At Exp</th><th>Ahora</th><th>-1d</th><th>-7d</th><th>-30d</th></tr></thead><tbody id="sgbPnlBody"></tbody></table>
+  </div>
+  <div class="sgb-tc" id="sgb-tc-greeks">
+    <div class="sgb-greeks-grid" id="sgbGreeksGrid"></div>
+  </div>
+
+  <!-- HISTORICAL PERFORMANCE -->
+  <div class="sgb-hist-wrap">
+    <div class="sgb-hist-header">
+      <div class="sgb-hist-title"><span class="sgb-hist-icon">◎</span> Historical Performance</div>
+      <div style="font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace;margin-right:8px">How would the strategy have performed at each historical price?</div>
+      <div class="sgb-hist-period">
+        <button class="sgb-period-btn" onclick="sgbSetPeriod('1m',this)">1M</button>
+        <button class="sgb-period-btn active" onclick="sgbSetPeriod('3m',this)">3M</button>
+        <button class="sgb-period-btn" onclick="sgbSetPeriod('6m',this)">6M</button>
+        <button class="sgb-period-btn" onclick="sgbSetPeriod('1y',this)">1Y</button>
+      </div>
+    </div>
+    <div class="sgb-hist-chart-wrap"><canvas id="sgbHistChart" role="img" aria-label="Historical performance"></canvas></div>
+    <div class="sgb-hist-legend">
+      <span class="sgb-hist-leg"><span class="sgb-hist-leg-dot" style="background:#f59e0b"></span>Strategy P&L</span>
+      <span class="sgb-hist-leg"><span class="sgb-hist-leg-dot" style="background:#3b82f6"></span><span id="sgbHistTickerLbl">TSLA</span> Price</span>
+    </div>
+  </div>
+
+  <!-- POPUP -->
+  <div class="sgb-pop" id="sgbPop">
+    <div class="sgb-pop-hdr"><span id="sgbPopTitle">—</span><span class="sgb-pop-x" onclick="sgbClosePopup()">✕</span></div>
+    <div class="sgb-pop-qty"><div><div style="font-size:8px;color:#334155;margin-bottom:3px">Quantity</div><div style="display:flex;align-items:center;gap:5px"><button class="sgb-qbtn" onclick="sgbChgQ(-1)">‹</button><span class="sgb-qv" id="sgbPopQty">1</span><button class="sgb-qbtn" onclick="sgbChgQ(1)">›</button></div></div><div style="text-align:right"><div style="font-size:8px;color:#334155;margin-bottom:3px">Price</div><div style="font-size:13px;font-weight:600;color:#e0e8f0" id="sgbPopPrice">—</div></div></div>
+    <div class="sgb-pop-data"><div><div class="sgb-pd"><span class="sgb-pdl">Bid</span><span class="sgb-pdv" id="sgbPBid">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Volume</span><span class="sgb-pdv" id="sgbPVol">—</span></div><div class="sgb-pd"><span class="sgb-pdl">IV</span><span class="sgb-pdv" id="sgbPIV">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Theta</span><span class="sgb-pdv r" id="sgbPTheta">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Vega</span><span class="sgb-pdv" id="sgbPVega">—</span></div></div><div><div class="sgb-pd"><span class="sgb-pdl">Ask</span><span class="sgb-pdv a" id="sgbPAsk">—</span></div><div class="sgb-pd"><span class="sgb-pdl">OI</span><span class="sgb-pdv" id="sgbPOI">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Delta</span><span class="sgb-pdv g" id="sgbPDelta">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Gamma</span><span class="sgb-pdv" id="sgbPGamma">—</span></div><div class="sgb-pd"><span class="sgb-pdl">Rho</span><span class="sgb-pdv" id="sgbPRho">—</span></div></div></div>
+    <div class="sgb-pop-sep"></div>
+    <div class="sgb-pop-acts"><div class="sgb-pact" onclick="sgbSwitchType()">⇄ Switch to <span id="sgbSwLbl" style="color:#3b82f6">Put</span></div><div class="sgb-pact" onclick="sgbTogDir()">✓ <span id="sgbDirLbl">Sell to Close</span></div><div class="sgb-pact" onclick="sgbClosePopup()">📅 Change Expiration</div><div class="sgb-pact" onclick="sgbExcludeLeg()">◎ Exclude</div><div class="sgb-pop-sep"></div><div class="sgb-pact danger" onclick="sgbRemoveLeg()">✕ Remove</div></div>
+  </div>
+</div>
+
+<!-- SAVE MODAL -->
+<div class="sgb-save-modal" id="sgbSaveModal" onclick="if(event.target===this)sgbCloseSave()">
+  <div class="sgb-modal">
+    <div class="sgb-modal-title">Save &amp; Share this Trade <span class="sgb-modal-x" onclick="sgbCloseSave()">✕</span></div>
+    <div class="sgb-modal-field"><div class="sgb-modal-label">Trade Name: <span class="opt">(optional)</span></div><input class="sgb-modal-input" id="sgbTradeName" placeholder="TSLA Jun 15th 405C Long Call"></div>
+    <div class="sgb-modal-field"><div class="sgb-modal-label">Trade Description: <span class="opt">(optional)</span></div><textarea class="sgb-modal-textarea" id="sgbTradeDesc" placeholder="Enter your reasoning, notes, or due diligence here"></textarea></div>
+    <div class="sgb-modal-row"><span style="font-size:11px;color:#94a3b8;white-space:nowrap">Group:</span><select class="sgb-modal-sel" id="sgbGroupSel"><option value="All">All</option></select><button class="sgb-new-grp-btn" onclick="sgbCreateGroup()">+ New Group</button></div>
+    <button class="sgb-modal-save" onclick="sgbSaveTrade()">Save trade</button>
+  </div>
+</div>
+
+</div>
+<!-- END SIGMA BUILDER PANEL -->
 
 <!-- ── FOOTER ──────────────────────────────────────────────── -->
 <div class="footer">OPTIONS TERMINAL — Powered by Tradier &amp; Alpaca — Solo análisis técnico, no asesoramiento financiero</div>
@@ -1639,6 +2096,321 @@ setTimeout(initCharts,200);
 loadAssets();
 startTimer();
 window.addEventListener('resize',()=>{if(APP.currentMain==='intervalmap')drawIM();});
+
+// ═══════════════════════════════════════════════════════════
+// SIGMA BUILDER
+// ═══════════════════════════════════════════════════════════
+const SGB={
+  sym:'TSLA',name:'Tesla, Inc.',spot:407.12,iv:53,dte:2,dteFull:2,exp:'Jun 15',
+  dateSlider:100,range:5,strat:'long_call',stratLabel:'CALL',dir:'LONG',
+  legs:[],chart:null,histChart:null,rulerOffset:0,aLeg:-1,
+  allAssets:[],assetsLoaded:false,botTab:'chart',histPeriod:'3m',
+  trades:[],groups:['All']
+};
+const TICKER_PRICES={SPX:7431,SPY:742,QQQ:500,TSLA:407,AAPL:212,NVDA:138,MSFT:430,AMZN:238,META:567,GOOGL:360,AMD:163,NFLX:1020,GME:22,PLTR:28,COIN:245,IWM:210,GLD:230,XOM:115,JPM:248,NVDA:138};
+const TICKER_NAMES={SPX:'S&P 500 Index',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',TSLA:'Tesla, Inc.',AAPL:'Apple Inc.',NVDA:'NVIDIA Corporation',MSFT:'Microsoft Corporation',AMZN:'Amazon.com Inc.',META:'Meta Platforms Inc.',GOOGL:'Alphabet Inc.',AMD:'Advanced Micro Devices',NFLX:'Netflix Inc.',GME:'GameStop Corp.',PLTR:'Palantir Technologies',COIN:'Coinbase Global',IWM:'iShares Russell 2000',GLD:'SPDR Gold Shares',XOM:'Exxon Mobil Corp.',JPM:'JPMorgan Chase'};
+const SGB_STRATS={
+  long_call:()=>[{T:'C',L:true,dK:0,q:1}],
+  long_put:()=>[{T:'P',L:true,dK:0,q:1}],
+  short_call:()=>[{T:'C',L:false,dK:0,q:1}],
+  short_put:()=>[{T:'P',L:false,dK:0,q:1}],
+  bull_call_spread:()=>[{T:'C',L:true,dK:0,q:1},{T:'C',L:false,dK:1,q:1}],
+  bear_put_spread:()=>[{T:'P',L:true,dK:0,q:1},{T:'P',L:false,dK:-1,q:1}],
+  bull_put_spread:()=>[{T:'P',L:false,dK:0,q:1},{T:'P',L:true,dK:-1,q:1}],
+  bear_call_spread:()=>[{T:'C',L:false,dK:0,q:1},{T:'C',L:true,dK:1,q:1}],
+  iron_butterfly:()=>[{T:'P',L:false,dK:-1,q:1},{T:'P',L:true,dK:0,q:1},{T:'C',L:true,dK:0,q:1},{T:'C',L:false,dK:1,q:1}],
+  iron_condor:()=>[{T:'P',L:false,dK:-2,q:1},{T:'P',L:true,dK:-1,q:1},{T:'C',L:true,dK:1,q:1},{T:'C',L:false,dK:2,q:1}],
+  straddle:()=>[{T:'P',L:true,dK:0,q:1},{T:'C',L:true,dK:0,q:1}],
+  strangle:()=>[{T:'P',L:true,dK:-1,q:1},{T:'C',L:true,dK:1,q:1}],
+  covered_call:()=>[{T:'S',L:true,dK:0,q:1},{T:'C',L:false,dK:1,q:1}],
+  cash_secured_put:()=>[{T:'P',L:false,dK:0,q:1}],
+};
+
+function sgbStep(){const s=SGB.sym,p=SGB.spot;if(['SPX','SPXW','NDX','RUT'].includes(s))return 5;if(['SPY','QQQ','IWM','GLD','TLT'].includes(s))return 1;if(p>500)return 5;if(p>100)return 2.5;if(p>50)return 1;return 0.5;}
+function sgbBase(){const st=sgbStep();return Math.round(SGB.spot/st)*st;}
+function sgbBuildLegs(key){const fn=SGB_STRATS[key]||SGB_STRATS.long_call,b=sgbBase(),st=sgbStep();SGB.legs=fn().map(l=>({...l,strike:b+l.dK*st,excl:false}));}
+
+// BS math
+function sgbN(x){return .5*(1+sgbErf(x/Math.sqrt(2)));}
+function sgbErf(x){const a=Math.abs(x),t=1/(1+.3275911*a),p=t*(.254829592+t*(-.284496736+t*(1.421413741+t*(-1.453152027+t*1.061405429))));return x>=0?1-p*Math.exp(-a*a):p*Math.exp(-a*a)-1;}
+function sgbBs(px,K,T,iv,type){if(T<=0)return type==='C'?Math.max(0,px-K):Math.max(0,K-px);const v=iv/100,r=.05,sq=Math.sqrt(T),d1=(Math.log(px/K)+(r+v*v/2)*T)/(v*sq),d2=d1-v*sq;return type==='C'?px*sgbN(d1)-K*Math.exp(-r*T)*sgbN(d2):K*Math.exp(-r*T)*sgbN(-d2)-px*sgbN(-d1);}
+function sgbBsD(px,K,T,iv,t){if(T<=0)return t==='C'?+(px>K):-(px<K);const v=iv/100,d1=(Math.log(px/K)+(.05+v*v/2)*T)/(v*Math.sqrt(T));return t==='C'?sgbN(d1):sgbN(d1)-1;}
+function sgbBsG(px,K,T,iv){if(T<=0)return 0;const v=iv/100,d1=(Math.log(px/K)+(.05+v*v/2)*T)/(v*Math.sqrt(T));return Math.exp(-d1*d1/2)/(px*v*Math.sqrt(T)*Math.sqrt(2*Math.PI));}
+function sgbBsTh(px,K,T,iv,t){if(T<=0)return 0;const v=iv/100,r=.05,d1=(Math.log(px/K)+(r+v*v/2)*T)/(v*Math.sqrt(T)),d2=d1-v*Math.sqrt(T),nd=Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI);return t==='C'?(-px*nd*v/(2*Math.sqrt(T))-r*K*Math.exp(-r*T)*sgbN(d2))/365:(-px*nd*v/(2*Math.sqrt(T))+r*K*Math.exp(-r*T)*sgbN(-d2))/365;}
+function sgbBsVe(px,K,T,iv){if(T<=0)return 0;const v=iv/100,d1=(Math.log(px/K)+(.05+v*v/2)*T)/(v*Math.sqrt(T));return px*Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI)*Math.sqrt(T)/100;}
+function sgbBsRh(px,K,T,iv,t){if(T<=0)return 0;const v=iv/100,r=.05,d1=(Math.log(px/K)+(r+v*v/2)*T)/(v*Math.sqrt(T)),d2=d1-v*Math.sqrt(T);return t==='C'?K*T*Math.exp(-r*T)*sgbN(d2)/100:-K*T*Math.exp(-r*T)*sgbN(-d2)/100;}
+function sgbDir(l){return l.L?1:-1;}
+function sgbCurT(){return Math.max(SGB.dteFull*(1-SGB.dateSlider/100)/365,.0000274);}
+function sgbLpl(l,px,T){if(l.excl||l.T==='S')return 0;const eT=Math.max(SGB.dteFull/365,.0000274),en=sgbBs(SGB.spot,l.strike,eT,SGB.iv,l.T),cu=sgbBs(px,l.strike,T,SGB.iv,l.T);return sgbDir(l)*(cu-en)*100*(l.q||1);}
+function sgbTotPL(px,T){return SGB.legs.reduce((a,l)=>a+sgbLpl(l,px,T),0);}
+
+// Dropdowns
+function sgbCloseAllDrops(){['sgbStratMenu','sgbLegsMenu','sgbPosMenu','sgbSearchDrop'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.remove('show','open');});}
+function sgbToggleStratMenu(e){e.stopPropagation();sgbCloseAllDrops();const m=document.getElementById('sgbStratMenu');if(m)m.classList.toggle('show');}
+function sgbToggleLegsMenu(e){e.stopPropagation();sgbCloseAllDrops();const m=document.getElementById('sgbLegsMenu');if(m)m.classList.toggle('show');}
+function sgbTogglePosMenu(e){e.stopPropagation();sgbCloseAllDrops();const m=document.getElementById('sgbPosMenu');if(m)m.classList.toggle('show');}
+document.addEventListener('click',e=>{if(!e.target.closest('#sgb'))sgbCloseAllDrops();if(!e.target.closest('.sgb-pop')&&!e.target.closest('.sgb-lh'))sgbClosePopup();});
+
+// Strategy select
+function sgbSelStrat(key,label,dir,type){SGB.strat=key;SGB.stratLabel=label;SGB.dir=dir;const lbl=document.getElementById('sgbStratLabel');if(lbl)lbl.textContent=label;sgbBuildLegs(key);sgbCloseAllDrops();sgbRenderAll();}
+
+// Symbol search
+function sgbShowDrop(){const d=document.getElementById('sgbSearchDrop');if(d){d.classList.add('open');sgbRenderSearchItems(SGB.allAssets.slice(0,10));}}
+function sgbHideDrop(){const d=document.getElementById('sgbSearchDrop');if(d)d.classList.remove('open');}
+function sgbOnSearch(q){const d=document.getElementById('sgbSearchDrop');if(!d)return;d.classList.add('open');if(!SGB.assetsLoaded||!q.trim()){sgbRenderSearchItems(SGB.allAssets.slice(0,10));return;}const ql=q.toUpperCase();const ex=SGB.allAssets.filter(a=>a.sym.startsWith(ql));const fz=SGB.allAssets.filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||a.name?.toUpperCase().includes(ql)));sgbRenderSearchItems([...ex,...fz].slice(0,14));}
+function sgbRenderSearchItems(items){const d=document.getElementById('sgbSearchDrop');if(!d)return;if(!items.length){d.innerHTML='<div style="padding:10px;font-size:9px;color:#334155;font-family:JetBrains Mono,monospace">Sin resultados</div>';return;}d.innerHTML=items.map(a=>`<div class="sgb-sdi" onmousedown="sgbSelectSym('${a.sym}','${(a.name||'').replace(/'/g,"\\'")}')"><span class="sgb-sds">${a.sym}</span><span class="sgb-sdn">${a.name||''}</span></div>`).join('');}
+function sgbSelectSym(sym,name){
+  SGB.sym=sym;SGB.name=name||TICKER_NAMES[sym]||sym;
+  SGB.spot=TICKER_PRICES[sym]||+(Math.random()*300+20).toFixed(2);
+  SGB.iv=Math.round(20+Math.random()*60);
+  const inp=document.getElementById('sgbSearchIn');if(inp)inp.value='';
+  sgbHideDrop();sgbUpdateTickerUI();sgbBuildLegs(SGB.strat);SGB.rulerOffset=0;
+  const ivsl=document.getElementById('sgbIvSlider');if(ivsl)ivsl.value=SGB.iv;
+  const ivv=document.getElementById('sgbIvV');if(ivv)ivv.textContent=`${SGB.iv}%`;
+  const hl=document.getElementById('sgbHistTickerLbl');if(hl)hl.textContent=sym;
+  sgbRenderAll();sgbBuildHistChart();
+}
+function sgbUpdateTickerUI(){
+  const chg=+((Math.random()-.4)*SGB.spot*.02).toFixed(2),pct=+(chg/SGB.spot*100).toFixed(2);
+  const logo=document.getElementById('sgbTickerLogo');if(logo){logo.textContent=SGB.sym.slice(0,1);logo.style.background=`linear-gradient(135deg,${chg>=0?'#22c55e,#16a34a':'#ef4444,#dc2626'})`;}
+  const tn=document.getElementById('sgbTickerName');if(tn)tn.textContent=SGB.name;
+  const tp=document.getElementById('sgbTickerPrice');if(tp)tp.textContent=`$${SGB.spot.toFixed(2)}`;
+  const tc=document.getElementById('sgbTickerChg');if(tc){tc.textContent=`${chg>=0?'+':''}${chg} (${pct}%)`;tc.className=`sgb-ticker-chg ${chg>=0?'up':'dn'}`;}
+}
+
+// Ruler
+function sgbGetRng(){const st=sgbStep();return{min:SGB.spot-40*st,max:SGB.spot+40*st,st};}
+function sgbS2x(strike,W){const{min,max}=sgbGetRng();return((strike-min)/(max-min))*W+SGB.rulerOffset;}
+function sgbDrawRuler(){
+  const cv=document.getElementById('sgbRulerCanvas'),wrap=document.getElementById('sgbRulerWrap');
+  if(!cv||!wrap)return;const W=wrap.clientWidth,H=80;cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,W,H);
+  const midY=H*.55,{min,max,st}=sgbGetRng(),nS=Math.round((max-min)/st),pxPS=W/nS;
+  // background gradient
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(34,197,94,0.04)');
+  grad.addColorStop(.5,'rgba(0,0,0,0)');
+  grad.addColorStop(1,'rgba(239,68,68,0.04)');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+  // center line
+  ctx.strokeStyle='#1a2535';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,midY);ctx.lineTo(W,midY);ctx.stroke();
+  const labEvery=Math.max(1,Math.ceil(55/pxPS));
+  for(let i=0;i<=nS;i++){
+    const s=min+i*st,x=sgbS2x(s,W);if(x<-5||x>W+5)continue;
+    ctx.strokeStyle='#1a2535';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,midY-3);ctx.lineTo(x,midY+3);ctx.stroke();
+    const cOI=Math.abs(Math.sin(s*.031+2.1))*Math.min(16,pxPS*1.4);
+    const pOI=Math.abs(Math.cos(s*.027+.8))*Math.min(13,pxPS*1.2);
+    ctx.fillStyle='#22c55e55';ctx.fillRect(x-Math.min(1.4,pxPS*.4),midY-3-cOI,Math.min(2.8,pxPS*.8),cOI);
+    ctx.fillStyle='#ef444455';ctx.fillRect(x-Math.min(1.4,pxPS*.4),midY+3,Math.min(2.8,pxPS*.8),pOI);
+    if(i%labEvery===0){const lbl=s>=1000?s.toFixed(0):(s%1===0?s.toFixed(0):s.toFixed(1));ctx.fillStyle='#1a2535';ctx.font='7px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(lbl,x,midY+22);}
+  }
+  // spot triangle
+  const sx=sgbS2x(SGB.spot,W);
+  ctx.fillStyle='#475569';
+  ctx.beginPath();ctx.moveTo(sx,midY-2);ctx.lineTo(sx-6,midY-13);ctx.lineTo(sx+6,midY-13);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#64748b';ctx.font='bold 8px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(SGB.sym,sx,midY-16);
+  sgbRenderHandles(W,midY,H);
+}
+function sgbRenderHandles(W,midY,H){
+  const layer=document.getElementById('sgbLegsLayer');if(!layer)return;layer.innerHTML='';
+  SGB.legs.forEach((l,i)=>{
+    if(l.T==='S'||l.excl)return;
+    const x=sgbS2x(l.strike,W);if(x<-40||x>W+40)return;
+    const isC=l.T==='C',qty=(l.q||1)>1?` x${l.q}`:'';
+    const lbl=`${l.strike.toFixed(l.strike%1?1:0)} ${l.T}${qty}`;
+    const h=document.createElement('div');h.className='sgb-lh';h.style.left=x+'px';
+    if(l.L){
+      const sh=Math.max(2,midY-24);h.style.top='2px';
+      h.innerHTML=`<div class="sgb-lp ${isC?'c':'p'}">${lbl}${(l.q||1)>1?`<span class="qty-badge">${l.q}</span>`:''}</div><div class="sgb-lsm" style="height:${sh}px"></div><div class="sgb-ldt ${isC?'c':'p'}"></div>`;
+    } else {
+      const sh=Math.max(2,H-midY-26);h.style.top=`${midY}px`;
+      h.innerHTML=`<div class="sgb-ldt ${isC?'c':'p'}"></div><div class="sgb-lsm" style="height:${sh}px"></div><div class="sgb-lp ${isC?'c':'p'}">${lbl}${(l.q||1)>1?`<span class="qty-badge">${l.q}</span>`:''}</div>`;
+    }
+    let sX,sK;
+    const onD=e=>{if(e.button===2)return;e.preventDefault();e.stopPropagation();sX=e.touches?e.touches[0].clientX:e.clientX;sK=l.strike;
+      const{min,max,st}=sgbGetRng();
+      const mv=ev=>{const cx=ev.touches?ev.touches[0].clientX:ev.clientX;l.strike=Math.round((sK+(cx-sX)/W*(max-min))/st)*st;sgbDrawRuler();sgbUpdateLegSum();sgbCalcMetrics();sgbBuildChart();};
+      const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up);};
+      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);document.addEventListener('touchmove',mv,{passive:false});document.addEventListener('touchend',up);};
+    h.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();sgbShowPop(i,e.clientX,e.clientY);});
+    h.addEventListener('mousedown',onD);
+    h.addEventListener('touchstart',e=>{e.stopPropagation();const t=setTimeout(()=>sgbShowPop(i,e.touches[0].clientX,e.touches[0].clientY),500);h.addEventListener('touchend',()=>clearTimeout(t),{once:true});onD(e);},{passive:false});
+    layer.appendChild(h);
+  });
+}
+function sgbInitPan(){
+  const w=document.getElementById('sgbRulerWrap');if(!w||w._p)return;w._p=true;let sX,sO;
+  w.addEventListener('mousedown',e=>{if(e.target.closest('.sgb-lh')||e.button===2)return;sX=e.clientX;sO=SGB.rulerOffset;const mv=e2=>{SGB.rulerOffset=sO+(e2.clientX-sX);sgbDrawRuler();};const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});
+  w.addEventListener('contextmenu',e=>e.preventDefault());
+}
+
+// Metrics
+function sgbCalcMetrics(){
+  const N=300,rng=SGB.range*.01,prices=Array.from({length:N},(_,i)=>SGB.spot*(1-rng)+i/(N-1)*SGB.spot*rng*2);
+  const plsE=prices.map(p=>sgbTotPL(p,0));
+  const maxP=Math.max(...plsE),maxL=Math.min(...plsE);
+  const eT=Math.max(SGB.dteFull/365,.0000274),entry=sgbTotPL(SGB.spot,eT);
+  const isDebit=entry<0;
+  const bes=[];for(let i=1;i<plsE.length;i++)if(plsE[i-1]*plsE[i]<0)bes.push((prices[i-1]+prices[i])/2);
+  const pop=Math.round(plsE.filter(v=>v>0).length/N*100);
+  const p50prices=prices.filter((_,i)=>plsE[i]>=-Math.abs(maxP)*.5&&plsE[i]<=Math.abs(maxP)*.5);
+  const el=id=>document.getElementById(id);
+  if(el('sgbNetDebit')){el('sgbNetDebit').textContent=`${isDebit?'-':''}$${Math.abs(entry).toFixed(0)}`;el('sgbNetDebit').className=`sgb-mi-val ${isDebit?'red':'green'}`;}
+  if(el('sgbMaxLoss'))el('sgbMaxLoss').textContent=maxL<-999999?'Unlimited':`$${Math.abs(maxL).toFixed(0)}`;
+  if(el('sgbMaxProfit'))el('sgbMaxProfit').textContent=maxP>999999?'Infinite':`$${maxP.toFixed(0)}`;
+  if(el('sgbBe'))el('sgbBe').textContent=bes.length?`$${bes[0].toFixed(2)}`:'N/A';
+  if(el('sgbPop2'))el('sgbPop2').textContent=`${pop}%`;
+  if(el('sgbP50'))el('sgbP50').textContent=`${Math.round(pop*.75)}%`;
+  // Net Quote
+  const midPx=Math.abs(entry);const bid=(midPx*.95).toFixed(2),ask=(midPx*1.05).toFixed(2);
+  if(el('sgbBid'))el('sgbBid').textContent=`$${bid} db`;
+  if(el('sgbMid'))el('sgbMid').textContent=`$${midPx.toFixed(2)} db`;
+  if(el('sgbAsk'))el('sgbAsk').textContent=`$${ask} db`;
+  // Portfolio Greeks
+  let de=0,ga=0,th=0,ve=0,rh=0;
+  SGB.legs.forEach(l=>{if(l.excl||l.T==='S')return;const d=sgbDir(l),m=l.q||1;de+=d*sgbBsD(SGB.spot,l.strike,eT,SGB.iv,l.T)*100*m;ga+=d*sgbBsG(SGB.spot,l.strike,eT,SGB.iv)*100*m;th+=d*sgbBsTh(SGB.spot,l.strike,eT,SGB.iv,l.T)*100*m;ve+=d*sgbBsVe(SGB.spot,l.strike,eT,SGB.iv)*100*m;rh+=d*sgbBsRh(SGB.spot,l.strike,eT,SGB.iv,l.T)*100*m;});
+  const fc=(v,d=2)=>`${v>=0?'':'-'}${Math.abs(v).toFixed(d)}`;
+  if(el('sgbDelta')){el('sgbDelta').textContent=fc(de);el('sgbDelta').className=`sgb-mi-val ${de>=0?'green':'red'}`;}
+  if(el('sgbTheta')){el('sgbTheta').textContent=fc(th*365,2);el('sgbTheta').className=`sgb-mi-val ${th>=0?'green':'red'}`;}
+  if(el('sgbGamma'))el('sgbGamma').textContent=fc(ga,3);
+  if(el('sgbVega'))el('sgbVega').textContent=fc(ve,2);
+  if(el('sgbRho'))el('sgbRho').textContent=fc(rh,2);
+  // Greeks grid
+  sgbBuildGreeksGrid(de,th,ga,ve,rh);
+  return{maxP,maxL,entry,bes,plsE,prices,pop};
+}
+
+// Chart
+let _sgbPrices=[],_sgbPlExp=[],_sgbPlNow=[];
+function sgbBuildChart(){
+  const rng=SGB.range*.01,N=120;
+  _sgbPrices=Array.from({length:N},(_,i)=>SGB.spot*(1-rng)+i/(N-1)*SGB.spot*rng*2);
+  const Tn=sgbCurT();
+  _sgbPlExp=_sgbPrices.map(p=>sgbTotPL(p,0));
+  _sgbPlNow=_sgbPrices.map(p=>sgbTotPL(p,Tn));
+  const mxA=Math.max(...[..._sgbPlExp,..._sgbPlNow].map(Math.abs),.1);
+  const sig=SGB.spot*(SGB.iv/100)*Math.sqrt(Math.max(Tn,.0000274));
+  const prob=_sgbPrices.map(p=>Math.exp(-.5*Math.pow((p-SGB.spot)/sig,2))/(sig*Math.sqrt(2*Math.PI))*SGB.spot*rng*2/N*mxA*1.6);
+  const posE=_sgbPlExp.map(v=>v>=0?v:null),negE=_sgbPlExp.map(v=>v<0?v:null);
+  const atExp=SGB.dateSlider>=99;
+  const posN=_sgbPlNow.map(v=>v>=0?v:null),negN=_sgbPlNow.map(v=>v<0?v:null);
+  const cv=document.getElementById('sgbPlChart');if(!cv)return;
+  if(SGB.chart)SGB.chart.destroy();
+  SGB.chart=new Chart(cv,{type:'line',data:{labels:_sgbPrices.map(p=>`$${p.toFixed(0)}`),datasets:[
+    {data:prob,borderColor:'transparent',backgroundColor:'rgba(30,60,120,0.20)',fill:true,tension:.3,pointRadius:0,order:5},
+    {data:posE,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.22)',fill:true,tension:.1,pointRadius:0,borderWidth:2,spanGaps:false,order:1},
+    {data:negE,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.18)',fill:true,tension:.1,pointRadius:0,borderWidth:2,spanGaps:false,order:1},
+    {data:atExp?[]:posN,borderColor:'rgba(34,197,94,.5)',backgroundColor:'transparent',tension:.1,pointRadius:0,borderWidth:1.5,borderDash:[5,3],spanGaps:false,order:2},
+    {data:atExp?[]:negN,borderColor:'rgba(239,68,68,.5)',backgroundColor:'transparent',tension:.1,pointRadius:0,borderWidth:1.5,borderDash:[5,3],spanGaps:false,order:2},
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},maxTicksLimit:14,maxRotation:0}},y:{grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},callback:v=>`$${v.toFixed(0)}`},min:-mxA*1.15,max:mxA*1.25}}}});
+  const orig=SGB.chart.draw.bind(SGB.chart);
+  SGB.chart.draw=function(){orig();const{ctx,chartArea:{left,right,top,bottom},scales:{x,y}}=SGB.chart;const y0=y.getPixelForValue(0),si=Math.floor(N/2),xSp=x.getPixelForValue(si);ctx.save();ctx.strokeStyle='#1a3050';ctx.lineWidth=1;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(left,y0);ctx.lineTo(right,y0);ctx.stroke();ctx.strokeStyle='#3b82f633';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(xSp,top);ctx.lineTo(xSp,bottom);ctx.stroke();ctx.fillStyle='#3b82f6';ctx.font='bold 8px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(`$${SGB.spot.toLocaleString()}`,xSp,top+10);const bes2=[];for(let i=1;i<_sgbPlExp.length;i++)if(_sgbPlExp[i-1]*_sgbPlExp[i]<0)bes2.push((_sgbPrices[i-1]+_sgbPrices[i])/2);bes2.forEach((be,bi)=>{const bI=_sgbPrices.findIndex(p=>p>=be);if(bI<0)return;const xb=x.getPixelForValue(bI);ctx.strokeStyle='#f59e0b44';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(xb,top);ctx.lineTo(xb,bottom);ctx.stroke();ctx.fillStyle='#f59e0b';ctx.font='bold 8px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(`$${be.toFixed(2)}`,xb,top+10+(bi*12));});if(!atExp){const plAtSpot=sgbTotPL(SGB.spot,sgbCurT()),yNow=y.getPixelForValue(plAtSpot);ctx.fillStyle='#ffffff';ctx.strokeStyle='#0d1520';ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();ctx.arc(xSp,yNow,4,0,Math.PI*2);ctx.fill();ctx.stroke();}ctx.restore();};
+  SGB.chart.draw();
+  sgbInitHover();sgbRefreshBotContent();
+}
+
+// Hover tooltip
+function sgbInitHover(){
+  const canvas=document.getElementById('sgbPlChart'),tt=document.getElementById('sgbTooltip');if(!canvas||!tt||canvas._h)return;canvas._h=true;
+  canvas.addEventListener('mousemove',e=>{
+    if(!SGB.chart)return;const rect=canvas.getBoundingClientRect(),mx=e.clientX-rect.left;
+    const{chartArea:{left,right}}=SGB.chart;if(mx<left||mx>right){tt.style.display='none';return;}
+    const N=_sgbPrices.length,frac=(mx-left)/(right-left),idx=Math.max(0,Math.min(N-1,Math.round(frac*(N-1))));
+    const price=_sgbPrices[idx],atExp=SGB.dateSlider>=99,dpl=atExp?_sgbPlExp[idx]:_sgbPlNow[idx];
+    let tx=mx+12,ty=e.clientY-rect.top-10;if(tx+120>right)tx=mx-130;if(ty+75>canvas.clientHeight)ty=ty-65;
+    tt.style.left=tx+'px';tt.style.top=ty+'px';tt.style.display='block';
+    const pp=document.getElementById('sgbTtPrice');if(pp)pp.textContent=`$${price.toFixed(2)}`;
+    const pl=document.getElementById('sgbTtPl');if(pl){pl.textContent=`${dpl>=0?'+':''}$${dpl.toFixed(2)}`;pl.className=`sgb-ct-pl ${dpl>=0?'pos':'neg'}`;}
+    const rem=SGB.dteFull*(1-SGB.dateSlider/100);const pt=document.getElementById('sgbTtTime');if(pt)pt.textContent=atExp?'At expiration':`${rem.toFixed(1)}d remaining`;
+  });
+  canvas.addEventListener('mouseleave',()=>{tt.style.display='none';});
+}
+
+// Historical chart
+function sgbBuildHistChart(){
+  const cv=document.getElementById('sgbHistChart');if(!cv)return;
+  const N=90;const priceData=[];const plData=[];
+  let px=SGB.spot*.85;
+  for(let i=0;i<N;i++){px+=px*((Math.random()-.48)*.03);priceData.push(+px.toFixed(2));}
+  const minP=Math.min(...priceData),maxP=Math.max(...priceData);
+  priceData.forEach(p=>{const frac=(p-minP)/(maxP-minP||1);plData.push(+(frac*SGB.spot*.15-SGB.spot*.05).toFixed(2));});
+  const labels=Array.from({length:N},(_,i)=>{const d=new Date(2026,5,13-N+i);return i%15===0?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''});
+  if(SGB.histChart)SGB.histChart.destroy();
+  SGB.histChart=new Chart(cv,{type:'line',data:{labels,datasets:[
+    {label:'Strategy P&L',data:plData,borderColor:'#f59e0b',backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.5,yAxisID:'y'},
+    {label:`${SGB.sym} Price`,data:priceData,borderColor:'#3b82f6',backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.2,borderDash:[4,3],yAxisID:'y2'},
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'}}},y:{position:'left',grid:{color:'#131d2a',drawBorder:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},callback:v=>`$${v.toFixed(0)}`}},y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#1a2535',font:{size:7,family:'JetBrains Mono'},callback:v=>`$${v.toFixed(0)}`}}}}});
+}
+
+// Greeks grid
+function sgbBuildGreeksGrid(de,th,ga,ve,rh){
+  const el=document.getElementById('sgbGreeksGrid');if(!el)return;
+  const items=[
+    {icon:'Δ',name:'DELTA',val:de,color:de>=0?'#22c55e':'#ef4444',desc:'Price sensitivity'},
+    {icon:'Θ',name:'THETA',val:th*365,color:th>=0?'#22c55e':'#ef4444',desc:'Time decay/day'},
+    {icon:'Γ',name:'GAMMA',val:ga,color:'#a78bfa',desc:'Delta acceleration',d:3},
+    {icon:'ν',name:'VEGA',val:ve,color:'#3b82f6',desc:'IV sensitivity'},
+    {icon:'ρ',name:'RHO',val:rh,color:'#f472b6',desc:'Rate sensitivity'},
+    {icon:'Δ/σ',name:'VANNA',val:de*ga*.01,color:'#f59e0b',desc:'Delta vs vol'},
+  ];
+  el.innerHTML=items.map((it,i)=>{const d=it.d||2;const sel=document.getElementById('sgb-tc-greeks')?.classList.contains('show');return`<div class="sgb-gk-card ${sel?'selected':''}" onclick="this.classList.toggle('selected')"><div class="sgb-gk-icon" style="color:${it.color}">${it.icon}</div><div class="sgb-gk-name">${it.name}</div><div class="sgb-gk-val" style="color:${it.color}">${it.val>=0?'':'-'}${Math.abs(it.val).toFixed(d)}</div><div style="font-size:8px;color:#334155;margin-top:2px;font-family:'JetBrains Mono',monospace">${it.desc}</div></div>`;}).join('');
+}
+
+// Bottom tabs
+function sgbBotTab(tab,el){SGB.botTab=tab;document.querySelectorAll('.sgb-btab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.sgb-tc').forEach(tc=>tc.classList.remove('show'));const co=document.getElementById('sgbChartOuter');if(co)co.style.display=['chart','table','pnl'].includes(tab)?'block':'none';if(tab!=='chart'){const tc=document.getElementById('sgb-tc-'+tab);if(tc)tc.classList.add('show');}sgbRefreshBotContent();}
+function sgbRefreshBotContent(){if(SGB.botTab==='table')sgbBTable();else if(SGB.botTab==='pnl')sgbBPnl();}
+function sgbPR(rng,N){return Array.from({length:N},(_,i)=>SGB.spot*(1-rng)+i/(N-1)*SGB.spot*rng*2);}
+function sgbBTable(){const rng=SGB.range*.01,N=20,T=sgbCurT(),pr=sgbPR(rng,N);const el=document.getElementById('sgbTblBody');if(!el)return;el.innerHTML=pr.map(p=>{const pl=sgbTotPL(p,0),plN=sgbTotPL(p,T),de=SGB.legs.filter(l=>!l.excl&&l.T!=='S').reduce((a,l)=>a+sgbDir(l)*sgbBsD(p,l.strike,T,SGB.iv,l.T)*100*(l.q||1),0),th=SGB.legs.filter(l=>!l.excl&&l.T!=='S').reduce((a,l)=>a+sgbDir(l)*sgbBsTh(p,l.strike,T,SGB.iv,l.T)*100*(l.q||1),0),ga=SGB.legs.filter(l=>!l.excl&&l.T!=='S').reduce((a,l)=>a+sgbDir(l)*sgbBsG(p,l.strike,T,SGB.iv)*100*(l.q||1),0),cur=Math.abs(p-SGB.spot)<SGB.spot*rng/N*1.5;return`<tr class="${cur?'cur':''}"><td>$${p.toFixed(0)}</td><td style="color:${pl>=0?'#22c55e':'#ef4444'}">$${pl.toFixed(0)}</td><td style="color:${plN>=0?'#22c55e88':'#ef444488'}">$${plN.toFixed(0)}</td><td>${de.toFixed(2)}</td><td style="color:#ef4444">${th.toFixed(2)}</td><td>${ga.toFixed(4)}</td></tr>`;}).join('');}
+function sgbBPnl(){const rng=SGB.range*.01,N=20,T0=0,T1=Math.max((SGB.dteFull-1)/365,.0000274),T7=Math.max((SGB.dteFull-7)/365,.0000274),T30=Math.max((SGB.dteFull-30)/365,.0000274),Tn=sgbCurT(),pr=sgbPR(rng,N);const el=document.getElementById('sgbPnlBody');if(!el)return;el.innerHTML=pr.map(p=>{const fc=v=>`<span style="color:${v>=0?'#22c55e':'#ef4444'}">$${v.toFixed(0)}</span>`,cur=Math.abs(p-SGB.spot)<SGB.spot*rng/N*1.5;return`<tr class="${cur?'cur':''}"><td>$${p.toFixed(0)}</td><td>${fc(sgbTotPL(p,T0))}</td><td>${fc(sgbTotPL(p,Tn))}</td><td>${fc(sgbTotPL(p,T1))}</td><td>${fc(sgbTotPL(p,T7))}</td><td>${fc(sgbTotPL(p,T30))}</td></tr>`;}).join('');}
+
+// Sliders
+function sgbOnDate(v){SGB.dateSlider=parseInt(v);const rem=SGB.dteFull*(1-v/100),atExp=v>=99;const ae=document.getElementById('sgbAtExp');if(ae)ae.textContent=atExp?'(At expiration)':`(${rem.toFixed(1)}d remaining)`;const dl=document.getElementById('sgbDateLabel');if(dl)dl.textContent=atExp?`${SGB.exp} 1:00pm (${SGB.dteFull}d)`:`${SGB.exp} - ${rem.toFixed(1)}d`;sgbBuildChart();}
+function sgbOnRange(v){SGB.range=parseInt(v);const el=document.getElementById('sgbRangeV');if(el)el.textContent=v;sgbRenderAll();}
+function sgbOnIV(v){SGB.iv=parseInt(v);const el=document.getElementById('sgbIvV');if(el)el.textContent=`${v}%`;sgbCalcMetrics();sgbBuildChart();}
+
+// Popup
+function sgbShowPop(idx,cx,cy){SGB.aLeg=idx;const l=SGB.legs[idx];if(!l)return;const T=Math.max(SGB.dteFull/365,.0000274),px=sgbBs(SGB.spot,l.strike,T,SGB.iv,l.T);const el=id=>document.getElementById(id);if(el('sgbPopTitle'))el('sgbPopTitle').textContent=`${SGB.sym} ${l.strike.toFixed(l.strike%1?1:0)}${l.T} ${SGB.exp.replace(' ','/')}/26`;if(el('sgbPopQty'))el('sgbPopQty').textContent=l.q||1;if(el('sgbPopPrice'))el('sgbPopPrice').textContent=px.toFixed(2);if(el('sgbPBid'))el('sgbPBid').textContent=(px*.95).toFixed(2);if(el('sgbPAsk'))el('sgbPAsk').textContent=(px*1.05).toFixed(2);if(el('sgbPVol'))el('sgbPVol').textContent=Math.round(Math.random()*5000+200).toLocaleString();if(el('sgbPOI'))el('sgbPOI').textContent=Math.round(Math.abs(Math.sin(l.strike*.031))*1200+100).toLocaleString();if(el('sgbPIV'))el('sgbPIV').textContent=`${SGB.iv}%`;if(el('sgbPDelta'))el('sgbPDelta').textContent=sgbBsD(SGB.spot,l.strike,T,SGB.iv,l.T).toFixed(3);if(el('sgbPGamma'))el('sgbPGamma').textContent=sgbBsG(SGB.spot,l.strike,T,SGB.iv).toFixed(4);if(el('sgbPTheta'))el('sgbPTheta').textContent=sgbBsTh(SGB.spot,l.strike,T,SGB.iv,l.T).toFixed(2);if(el('sgbPVega'))el('sgbPVega').textContent=sgbBsVe(SGB.spot,l.strike,T,SGB.iv).toFixed(2);if(el('sgbPRho'))el('sgbPRho').textContent=sgbBsRh(SGB.spot,l.strike,T,SGB.iv,l.T).toFixed(3);if(el('sgbSwLbl'))el('sgbSwLbl').textContent=l.T==='C'?'Put':'Call';if(el('sgbDirLbl'))el('sgbDirLbl').textContent=l.L?'Sell to Close':'Buy to Close';const pop=el('sgbPop');if(!pop)return;pop.classList.add('show');const r=document.getElementById('sgb').getBoundingClientRect();let px2=cx-r.left+8,py=cy-r.top-10;if(px2+248>r.width)px2=r.width-253;if(py+330>r.height)py=r.height-335;if(py<0)py=5;pop.style.left=px2+'px';pop.style.top=py+'px';}
+function sgbClosePopup(){const p=document.getElementById('sgbPop');if(p)p.classList.remove('show');SGB.aLeg=-1;}
+function sgbChgQ(d){if(SGB.aLeg<0)return;const l=SGB.legs[SGB.aLeg];l.q=Math.max(1,(l.q||1)+d);const el=document.getElementById('sgbPopQty');if(el)el.textContent=l.q;sgbRenderAll();}
+function sgbSwitchType(){if(SGB.aLeg<0)return;SGB.legs[SGB.aLeg].T=SGB.legs[SGB.aLeg].T==='C'?'P':'C';sgbClosePopup();sgbRenderAll();}
+function sgbTogDir(){if(SGB.aLeg<0)return;SGB.legs[SGB.aLeg].L=!SGB.legs[SGB.aLeg].L;sgbClosePopup();sgbRenderAll();}
+function sgbExcludeLeg(){if(SGB.aLeg<0)return;SGB.legs[SGB.aLeg].excl=!SGB.legs[SGB.aLeg].excl;sgbClosePopup();sgbRenderAll();}
+function sgbRemoveLeg(){if(SGB.aLeg<0)return;SGB.legs.splice(SGB.aLeg,1);sgbClosePopup();sgbRenderAll();}
+
+// Save/positions
+function sgbOpenSave(){const legStr=SGB.legs.filter(l=>l.T!=='S'&&!l.excl).map(l=>`${l.strike.toFixed(0)}${l.T}`).join('/');const tn=document.getElementById('sgbTradeName');if(tn)tn.value=`${SGB.sym} ${SGB.exp} ${legStr} ${SGB.stratLabel}`;const td=document.getElementById('sgbTradeDesc');if(td)td.value='';sgbRefGrp();const m=document.getElementById('sgbSaveModal');if(m)m.classList.add('show');}
+function sgbCloseSave(){const m=document.getElementById('sgbSaveModal');if(m)m.classList.remove('show');}
+function sgbRefGrp(){const sel=document.getElementById('sgbGroupSel');if(!sel)return;sel.innerHTML=SGB.groups.map(g=>`<option value="${g}">${g}</option>`).join('');}
+function sgbCreateGroup(){const name=prompt('Nombre del nuevo grupo:');if(!name||!name.trim())return;if(!SGB.groups.includes(name.trim())){SGB.groups.push(name.trim());sgbRefGrp();const sel=document.getElementById('sgbGroupSel');if(sel)sel.value=name.trim();}}
+function sgbSaveTrade(){const tn=document.getElementById('sgbTradeName'),td=document.getElementById('sgbTradeDesc'),gs=document.getElementById('sgbGroupSel');const name=(tn&&tn.value)||`${SGB.sym} ${SGB.exp} ${SGB.stratLabel}`,desc=(td&&td.value)||'',group=(gs&&gs.value)||'All';const m=sgbCalcMetrics();SGB.trades.push({id:Date.now(),name,desc,group,sym:SGB.sym,exp:SGB.exp,stratLabel:SGB.stratLabel,legs:JSON.parse(JSON.stringify(SGB.legs)),metrics:{entry:m.entry.toFixed(0),maxP:m.maxP.toFixed(0),maxL:m.maxL.toFixed(0),pop:m.pop},savedAt:new Date().toLocaleTimeString()});const pc=document.getElementById('sgbPosCount');if(pc)pc.textContent=SGB.trades.length;sgbRefPosList();sgbCloseSave();}
+function sgbRefPosList(){const pmc=document.getElementById('sgbPosMenuCount');if(pmc)pmc.textContent=SGB.trades.length;const list=document.getElementById('sgbPosMenuList');if(!list)return;if(!SGB.trades.length){list.innerHTML='<div class="sgb-pos-empty">Sin estrategias guardadas</div>';return;}list.innerHTML=SGB.trades.map(t=>`<div class="sgb-saved-item" onclick="sgbLoadTrade(${t.id})"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3b82f6">${t.sym}</span><span style="font-size:10px;color:#c8d4e0;font-weight:500">${t.stratLabel}</span><span style="font-size:7px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px">${t.group}</span></div><div style="font-size:8px;color:#334155;font-family:'JetBrains Mono',monospace">Entry: $${t.metrics.entry} · MaxP: $${t.metrics.maxP} · POP: ${t.metrics.pop}%${t.desc?` · <em>"${t.desc.slice(0,25)}"</em>`:''}</div></div><span class="sgb-si-del" onclick="event.stopPropagation();sgbDelTrade(${t.id})">x</span></div>`).join('');}
+function sgbLoadTrade(id){const t=SGB.trades.find(t=>t.id===id);if(!t)return;SGB.sym=t.sym;SGB.exp=t.exp;SGB.stratLabel=t.stratLabel;SGB.legs=JSON.parse(JSON.stringify(t.legs));sgbCloseAllDrops();sgbRenderAll();}
+function sgbDelTrade(id){SGB.trades=SGB.trades.filter(t=>t.id!==id);const pc=document.getElementById('sgbPosCount');if(pc)pc.textContent=SGB.trades.length;sgbRefPosList();}
+function sgbSetPeriod(p,el){SGB.histPeriod=p;document.querySelectorAll('.sgb-period-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');sgbBuildHistChart();}
+
+// Utils
+function sgbUpdateLegSum(){const el=document.getElementById('sgbLegSum');if(el)el.textContent=SGB.legs.filter(l=>!l.excl&&l.T!=='S').map(l=>`${l.L?'+':'-'}${l.strike.toFixed(l.strike%1?1:0)}${l.T}`).join(' / ');}
+function sgbAddLeg(T,L){SGB.legs.push({T,L,dK:0,strike:sgbBase(),q:1,excl:false});const m=document.getElementById('sgbLegsMenu');if(m)m.classList.remove('show');sgbRenderAll();}
+function sgbSetExp(btn,exp,dte){document.querySelectorAll('.sgb-exp-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');SGB.exp=exp;SGB.dte=dte;SGB.dteFull=dte;SGB.dateSlider=100;const dl=document.getElementById('sgbDteL');if(dl)dl.textContent=`${dte}d`;const dbl=document.getElementById('sgbDateLabel');if(dbl)dbl.textContent=`${exp} 1:00pm (${dte}d)`;const ae=document.getElementById('sgbAtExp');if(ae)ae.textContent='(At expiration)';const ds=document.getElementById('sgbDateSlider');if(ds)ds.value=100;sgbRenderAll();}
+function sgbRenderAll(){sgbUpdateLegSum();sgbCalcMetrics();sgbDrawRuler();sgbBuildChart();}
+
+// Assets for search (reuse main APP assets)
+function sgbLoadAssets(){if(APP&&APP.allAssets&&APP.allAssets.length){SGB.allAssets=APP.allAssets;SGB.assetsLoaded=true;}else{SGB.allAssets=Object.entries(TICKER_PRICES).map(([sym])=>({sym,name:TICKER_NAMES[sym]||sym}));SGB.assetsLoaded=true;}}
+
+// Override switchMain to init sigma builder
+const _origSwitchMain2=window.switchMain;
+window.switchMain=function(id,el){
+  _origSwitchMain2(id,el);
+  if(id==='sigmabuilder'){
+    setTimeout(()=>{
+      if(!SGB.legs.length){sgbBuildLegs('long_call');}
+      sgbLoadAssets();sgbInitPan();sgbUpdateTickerUI();sgbRenderAll();sgbBuildHistChart();
+    },80);
+  }
+};
+
 </script>
 </body>
 </html>
