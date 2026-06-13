@@ -316,6 +316,7 @@ html,body{background:#0A0A0F;color:#E0E0E8;font-family:'Inter',sans-serif;min-he
   <div class="mtab" onclick="switchMain('builder',this)">⚙ Strategy Builder</div>
   <div class="mtab" onclick="switchMain('sigmabuilder',this)">◈ Sigma Builder</div>
   <div class="mtab" onclick="switchMain('scanner',this)">🔍 Market Scanner</div>
+  <div class="mtab" onclick="switchMain('fundamentals',this)">📊 Fundamentals</div>
 </div>
 
 <!-- sub tabs -->
@@ -1623,6 +1624,322 @@ input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
 </div>
 <!-- END MARKET SCANNER PANEL -->
 
+<!-- ── FUNDAMENTALS PANEL ──────────────────────────────────── -->
+<div class="panel" id="panel-fundamentals" style="padding:0">
+<style>
+#fund{background:#0a0c10;color:#c8d4e0;font-family:'Inter',sans-serif;min-height:600px}
+#fund *{box-sizing:border-box}
+/* SEARCH BAR */
+.fund-search-bar{background:#0d1117;border-bottom:1px solid #1a2232;padding:14px 20px;display:flex;align-items:center;gap:10px}
+.fund-search-wrap{display:flex;flex:1;max-width:560px;gap:0;border:1.5px solid #1e3a5a;border-radius:6px;overflow:hidden;background:#111820}
+.fund-search-in{flex:1;background:transparent;border:none;color:#c8d4e0;font-size:13px;padding:9px 14px;font-family:'Inter',sans-serif}
+.fund-search-in:focus{outline:none}
+.fund-search-in::placeholder{color:#334155}
+.fund-search-btn{background:#e8b84b;border:none;color:#0a0c10;font-size:12px;font-weight:700;padding:9px 20px;cursor:pointer;white-space:nowrap}
+.fund-search-btn:hover{background:#d4a63a}
+.fund-sdrop{position:absolute;top:100%;left:0;right:0;background:#111820;border:1px solid #1e2a3a;border-radius:0 0 6px 6px;z-index:200;max-height:220px;overflow-y:auto;display:none}
+.fund-sdrop.open{display:block}
+.fund-sdi{padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #131d2a}
+.fund-sdi:hover{background:#1a2535}
+.fund-sdi-sym{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#e8b84b;min-width:52px}
+.fund-sdi-name{font-size:10px;color:#475569}
+/* COMPANY HEADER */
+.fund-company-hdr{background:#0d1117;border-bottom:1px solid #1a2232;padding:14px 20px;display:none}
+.fund-company-hdr.show{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.fund-logo{width:44px;height:44px;border-radius:8px;background:#1a2535;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#e8b84b;border:1px solid #1e3a5a;flex-shrink:0;overflow:hidden}
+.fund-logo img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.fund-co-name{font-size:18px;font-weight:700;color:#e8b84b}
+.fund-co-tags{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+.fund-co-tag{font-size:9px;color:#64748b;background:#1a2535;border:1px solid #1e2a3a;border-radius:3px;padding:1px 7px;font-family:'JetBrains Mono',monospace}
+.fund-co-tag.exchange{color:#3b82f6;border-color:#3b82f655}
+.fund-price-wrap{margin-left:auto;text-align:right}
+.fund-price{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:#c8d4e0}
+.fund-price-chg{font-family:'JetBrains Mono',monospace;font-size:11px}
+.fund-price-chg.up{color:#22c55e}.fund-price-chg.dn{color:#ef4444}
+.fund-sparkline{width:80px;height:36px;margin-right:10px}
+.fund-52w{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace}
+.fund-52w-bar{flex:1;height:4px;background:#1a2535;border-radius:2px;position:relative;max-width:140px}
+.fund-52w-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#ef4444,#e8b84b,#22c55e)}
+.fund-52w-dot{width:8px;height:8px;border-radius:50%;background:#e8b84b;border:2px solid #0a0c10;position:absolute;top:-2px;transform:translateX(-50%)}
+.fund-vol{font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:10px}
+/* DESCRIPTION */
+.fund-desc-wrap{background:#0d1117;border-bottom:1px solid #1a2232;padding:12px 20px;display:none}
+.fund-desc-wrap.show{display:block}
+.fund-desc-text{font-size:11px;color:#475569;line-height:1.6;max-height:60px;overflow:hidden;transition:max-height .3s}
+.fund-desc-text.expanded{max-height:400px}
+.fund-desc-more{font-size:10px;color:#e8b84b;cursor:pointer;margin-top:4px;display:inline-block}
+.fund-desc-more:hover{color:#d4a63a}
+/* SIMILAR */
+.fund-similar{background:#0d1117;border-bottom:1px solid #1a2232;padding:8px 20px;display:none;align-items:center;gap:8px;overflow-x:auto}
+.fund-similar.show{display:flex}
+.fund-similar-lbl{font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.fund-sim-btn{background:transparent;border:1px solid #1a2232;border-radius:3px;color:#64748b;font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0}
+.fund-sim-btn:hover{color:#e8b84b;border-color:#e8b84b55}
+/* METRICS GRID */
+.fund-metrics-grid{background:#0a0c10;border-bottom:1px solid #1a2232;padding:12px 20px;display:none;grid-template-columns:repeat(4,1fr);gap:8px}
+.fund-metrics-grid.show{display:grid}
+@media(max-width:600px){.fund-metrics-grid.show{grid-template-columns:repeat(2,1fr)}}
+.fund-metric-card{background:#0d1117;border:1px solid #1a2232;border-radius:6px;padding:10px 12px}
+.fund-mc-lbl{font-size:8px;color:#334155;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.fund-mc-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#e8b84b}
+.fund-mc-val.neutral{color:#c8d4e0}
+.fund-mc-val.green{color:#22c55e}
+.fund-mc-val.red{color:#ef4444}
+/* SUB TABS */
+.fund-tabs{background:#0d1117;border-bottom:1px solid #1a2232;padding:0 20px;display:none;overflow-x:auto}
+.fund-tabs.show{display:flex}
+.fund-tabs::-webkit-scrollbar{height:2px}
+.fund-tab{padding:10px 14px;font-size:10px;font-weight:500;color:#475569;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
+.fund-tab:hover{color:#c8d4e0}
+.fund-tab.active{color:#e8b84b;border-bottom-color:#e8b84b}
+/* PERIOD TOGGLE */
+.fund-period-bar{background:#0a0c10;padding:10px 20px;display:none;align-items:center;gap:6px}
+.fund-period-bar.show{display:flex}
+.fund-period-lbl{font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace;margin-right:4px}
+.fund-period-btn{background:transparent;border:1px solid #1a2232;border-radius:4px;color:#475569;font-size:9px;padding:4px 12px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .12s}
+.fund-period-btn:hover{color:#c8d4e0}
+.fund-period-btn.active{background:#e8b84b18;border-color:#e8b84b66;color:#e8b84b}
+.fund-section-title{font-size:12px;font-weight:600;color:#e8b84b;display:flex;align-items:center;gap:6px;margin-left:auto}
+/* CHARTS ROW */
+.fund-charts-row{display:none;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 20px;background:#0a0c10;border-bottom:1px solid #1a2232}
+.fund-charts-row.show{display:grid}
+@media(max-width:700px){.fund-charts-row.show{grid-template-columns:1fr}}
+.fund-chart-card{background:#0d1117;border:1px solid #1a2232;border-radius:8px;padding:10px}
+.fund-chart-card-title{font-size:10px;font-weight:500;color:#94a3b8;margin-bottom:8px}
+.fund-chart-mini{height:110px;position:relative}
+/* BIG CHARTS */
+.fund-big-charts{display:none;grid-template-columns:1fr 1fr;gap:10px;padding:10px 20px;background:#0a0c10;border-bottom:1px solid #1a2232}
+.fund-big-charts.show{display:grid}
+@media(max-width:700px){.fund-big-charts.show{grid-template-columns:1fr}}
+.fund-big-card{background:#0d1117;border:1px solid #1a2232;border-radius:8px;padding:10px}
+.fund-big-card-title{font-size:10px;font-weight:500;color:#94a3b8;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.fund-big-chart{height:180px}
+/* TABLE */
+.fund-table-wrap{display:none;padding:10px 20px;background:#0a0c10;overflow-x:auto}
+.fund-table-wrap.show{display:block}
+.fund-tbl{width:100%;border-collapse:collapse;font-size:10px;min-width:700px}
+.fund-tbl th{padding:8px 10px;color:#334155;font-weight:600;text-align:right;border-bottom:2px solid #1a2232;font-size:8px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#0d1117;position:sticky;top:0}
+.fund-tbl th:first-child{text-align:left;min-width:160px}
+.fund-tbl td{padding:7px 10px;color:#64748b;border-bottom:1px solid #0d1117;font-family:'JetBrains Mono',monospace;font-size:10px;text-align:right;white-space:nowrap}
+.fund-tbl td:first-child{text-align:left;color:#94a3b8;background:#0d1117;position:sticky;left:0;font-family:'Inter',sans-serif;font-size:10px}
+.fund-tbl tr.section-hdr td{background:#111820;color:#e8b84b;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:6px 10px}
+.fund-tbl tr.section-hdr td:first-child{color:#e8b84b}
+.fund-tbl tr.total-row td{color:#c8d4e0;font-weight:600}
+.fund-tbl td.neg{color:#ef4444}
+.fund-tbl td.pos{color:#22c55e}
+.fund-tbl tr:hover td:not(:first-child){background:#0f1820}
+/* RATIOS GRID */
+.fund-ratios-grid{display:none;grid-template-columns:repeat(2,1fr);gap:0;padding:0 20px 14px;background:#0a0c10}
+.fund-ratios-grid.show{display:grid}
+.fund-ratio-section{background:#0d1117;border:1px solid #1a2232;border-radius:8px;padding:12px;margin:5px}
+.fund-ratio-section-title{font-size:9px;color:#e8b84b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600}
+.fund-ratio-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #111820;font-family:'JetBrains Mono',monospace;font-size:10px}
+.fund-ratio-row:last-child{border-bottom:none}
+.fund-ratio-lbl{color:#475569}
+.fund-ratio-val{color:#c8d4e0;font-weight:600}
+.fund-ratio-val.green{color:#22c55e}.fund-ratio-val.amber{color:#e8b84b}.fund-ratio-val.red{color:#ef4444}
+/* DIVIDENDS */
+.fund-div-section{display:none;padding:10px 20px;background:#0a0c10}
+.fund-div-section.show{display:block}
+.fund-div-header{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.fund-div-card{background:#0d1117;border:1px solid #1a2232;border-radius:6px;padding:10px}
+.fund-div-lbl{font-size:8px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.fund-div-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:#e8b84b}
+.fund-div-chart{height:160px;background:#0d1117;border:1px solid #1a2232;border-radius:8px;padding:10px;margin-bottom:10px}
+/* HOLDERS */
+.fund-holders-wrap{display:none;padding:10px 20px;background:#0a0c10}
+.fund-holders-wrap.show{display:block}
+.fund-holders-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fund-holder-section{background:#0d1117;border:1px solid #1a2232;border-radius:8px;padding:12px}
+.fund-holder-title{font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:10px}
+.fund-holder-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #0a0c10;font-size:10px}
+.fund-holder-row:last-child{border-bottom:none}
+.fund-holder-rank{font-family:'JetBrains Mono',monospace;font-size:9px;color:#334155;min-width:18px}
+.fund-holder-name{color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fund-holder-pct{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e8b84b}
+.fund-holder-bar{flex:1;height:3px;background:#1a2232;border-radius:2px;overflow:hidden;max-width:80px}
+.fund-holder-bar-fill{height:100%;background:#e8b84b;border-radius:2px}
+/* COMPARATOR */
+.fund-comp-wrap{display:none;padding:10px 20px;background:#0a0c10}
+.fund-comp-wrap.show{display:block}
+.fund-comp-add{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.fund-comp-chip{display:flex;align-items:center;gap:4px;background:#1a2232;border:1px solid #1e3050;border-radius:4px;padding:3px 8px;font-size:9px;font-family:'JetBrains Mono',monospace;color:#e8b84b}
+.fund-comp-chip button{background:none;border:none;color:#475569;cursor:pointer;padding:0 2px;font-size:11px}
+.fund-comp-chip button:hover{color:#ef4444}
+.fund-comp-table-wrap{overflow-x:auto}
+/* EMPTY STATE */
+.fund-empty{text-align:center;padding:80px 20px}
+.fund-empty-icon{font-size:44px;margin-bottom:14px}
+.fund-empty-title{font-size:14px;color:#64748b;margin-bottom:6px}
+.fund-empty-sub{font-size:11px;color:#334155;line-height:1.7}
+/* LOADING */
+.fund-loading{display:none;text-align:center;padding:50px}
+.fund-loading.show{display:block}
+.fund-spinner{width:30px;height:30px;border:3px solid #1a2232;border-top-color:#e8b84b;border-radius:50%;animation:fund-spin .8s linear infinite;margin:0 auto 12px}
+@keyframes fund-spin{to{transform:rotate(360deg)}}
+</style>
+
+<div id="fund">
+  <!-- SEARCH BAR -->
+  <div class="fund-search-bar">
+    <div style="position:relative;flex:1;max-width:560px">
+      <div class="fund-search-wrap">
+        <input class="fund-search-in" id="fundSearchIn" placeholder="Buscar símbolo — Ej: AAPL, TSLA, MSFT..."
+          autocomplete="off" oninput="fundOnSearch(this.value)" onfocus="fundShowDrop()" onblur="setTimeout(fundHideDrop,200)"
+          onkeydown="if(event.key==='Enter')fundAnalyze()">
+        <button class="fund-search-btn" onclick="fundAnalyze()">🔍 Analizar</button>
+      </div>
+      <div class="fund-sdrop" id="fundSearchDrop"></div>
+    </div>
+  </div>
+
+  <!-- COMPANY HEADER -->
+  <div class="fund-company-hdr" id="fundCoHdr">
+    <div class="fund-logo" id="fundLogo">T</div>
+    <div>
+      <div class="fund-co-name" id="fundCoName">—</div>
+      <div class="fund-co-tags" id="fundCoTags"></div>
+    </div>
+    <div style="margin-left:16px;display:flex;align-items:center">
+      <div>
+        <div style="font-size:8px;color:#334155;font-family:'JetBrains Mono',monospace;margin-bottom:2px">52W Range</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace" id="fund52Low">—</span>
+          <div class="fund-52w-bar" style="width:120px"><div class="fund-52w-bar-fill" style="width:100%"></div><div class="fund-52w-dot" id="fund52Dot" style="left:65%"></div></div>
+          <span style="font-size:9px;color:#334155;font-family:'JetBrains Mono',monospace" id="fund52High">—</span>
+        </div>
+      </div>
+      <div class="fund-vol" id="fundVolLabel" style="margin-left:16px">
+        <div style="margin-bottom:2px">VOLUME</div>
+        <div style="color:#c8d4e0;font-size:10px" id="fundVolVal">—</div>
+      </div>
+    </div>
+    <div class="fund-price-wrap">
+      <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <canvas class="fund-sparkline" id="fundSparkline" width="80" height="36"></canvas>
+        <div>
+          <div class="fund-price" id="fundPrice">—</div>
+          <div class="fund-price-chg" id="fundPriceChg">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESCRIPTION -->
+  <div class="fund-desc-wrap" id="fundDescWrap">
+    <div class="fund-desc-text" id="fundDescText"></div>
+    <span class="fund-desc-more" id="fundDescMore" onclick="fundToggleDesc()">Ver más ▾</span>
+  </div>
+
+  <!-- SIMILAR -->
+  <div class="fund-similar" id="fundSimilar">
+    <span class="fund-similar-lbl">SIMILAR:</span>
+    <div id="fundSimilarList" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+  </div>
+
+  <!-- METRICS -->
+  <div class="fund-metrics-grid" id="fundMetricsGrid"></div>
+
+  <!-- SUB TABS -->
+  <div class="fund-tabs" id="fundTabs">
+    <div class="fund-tab active" onclick="fundSetTab('income',this)">Income Statement</div>
+    <div class="fund-tab" onclick="fundSetTab('balance',this)">Balance Sheet</div>
+    <div class="fund-tab" onclick="fundSetTab('cashflow',this)">Cash Flow</div>
+    <div class="fund-tab" onclick="fundSetTab('ratios',this)">Ratios</div>
+    <div class="fund-tab" onclick="fundSetTab('dividends',this)">Dividends</div>
+    <div class="fund-tab" onclick="fundSetTab('holders',this)">Holders</div>
+    <div class="fund-tab" onclick="fundSetTab('comparator',this)">Comparator</div>
+  </div>
+
+  <!-- PERIOD + SECTION TITLE -->
+  <div class="fund-period-bar" id="fundPeriodBar">
+    <span class="fund-period-lbl">Periodo:</span>
+    <button class="fund-period-btn active" onclick="fundSetPeriod('annual',this)">Anual</button>
+    <button class="fund-period-btn" onclick="fundSetPeriod('quarterly',this)">Trimestral</button>
+    <div class="fund-section-title" id="fundSectionTitle">📊 Income Statement</div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="fund-loading" id="fundLoading">
+    <div class="fund-spinner"></div>
+    <div style="font-size:11px;color:#475569;font-family:'JetBrains Mono',monospace">Cargando datos fundamentales...</div>
+  </div>
+
+  <!-- MINI CHARTS ROW (EPS, Revenue, Shares) -->
+  <div class="fund-charts-row" id="fundChartsRow">
+    <div class="fund-chart-card">
+      <div class="fund-chart-card-title">EPS (Diluted)</div>
+      <div class="fund-chart-mini"><canvas id="fundEpsChart"></canvas></div>
+    </div>
+    <div class="fund-chart-card">
+      <div class="fund-chart-card-title" id="fundChart2Title">Revenue</div>
+      <div class="fund-chart-mini"><canvas id="fundRevChart"></canvas></div>
+    </div>
+    <div class="fund-chart-card">
+      <div class="fund-chart-card-title" id="fundChart3Title">Shares Outstanding</div>
+      <div class="fund-chart-mini"><canvas id="fundSharesChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- BIG CHARTS (Revenue vs Net Income, Margins) -->
+  <div class="fund-big-charts" id="fundBigCharts">
+    <div class="fund-big-card">
+      <div class="fund-big-card-title" id="fundBigChart1Title">📊 Revenue vs Net Income</div>
+      <div class="fund-big-chart"><canvas id="fundRevNetChart"></canvas></div>
+    </div>
+    <div class="fund-big-card">
+      <div class="fund-big-card-title" id="fundBigChart2Title">📈 Márgenes</div>
+      <div class="fund-big-chart"><canvas id="fundMarginsChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="fund-table-wrap" id="fundTableWrap">
+    <div style="overflow-x:auto"><table class="fund-tbl" id="fundTable"></table></div>
+  </div>
+
+  <!-- RATIOS -->
+  <div class="fund-ratios-grid" id="fundRatiosGrid"></div>
+
+  <!-- DIVIDENDS -->
+  <div class="fund-div-section" id="fundDivSection">
+    <div class="fund-div-header" id="fundDivHeader"></div>
+    <div class="fund-div-chart"><canvas id="fundDivChart"></canvas></div>
+  </div>
+
+  <!-- HOLDERS -->
+  <div class="fund-holders-wrap" id="fundHoldersWrap">
+    <div class="fund-holders-grid" id="fundHoldersGrid"></div>
+  </div>
+
+  <!-- COMPARATOR -->
+  <div class="fund-comp-wrap" id="fundCompWrap">
+    <div class="fund-comp-add" id="fundCompChips">
+      <span style="font-size:10px;color:#475569;padding:4px 0">Compara con:</span>
+    </div>
+    <input class="fund-search-in" style="background:#111820;border:1px solid #1a2232;border-radius:4px;padding:6px 10px;width:100%;max-width:280px;margin-bottom:10px;font-size:11px"
+      placeholder="Añadir ticker para comparar..." id="fundCompIn" onkeydown="if(event.key==='Enter')fundAddComp(this.value)">
+    <div class="fund-comp-table-wrap"><table class="fund-tbl" id="fundCompTable"></table></div>
+  </div>
+
+  <!-- EMPTY -->
+  <div id="fundEmpty">
+    <div class="fund-empty">
+      <div class="fund-empty-icon">📊</div>
+      <div class="fund-empty-title">Análisis Fundamental</div>
+      <div class="fund-empty-sub">Ingresa un símbolo para ver earnings, ratios, financials,<br>dividendos, holders institucionales y más.<br><br>
+        <span style="color:#e8b84b;cursor:pointer" onclick="document.getElementById('fundSearchIn').value='AAPL';fundAnalyze()">AAPL</span> · 
+        <span style="color:#e8b84b;cursor:pointer" onclick="document.getElementById('fundSearchIn').value='TSLA';fundAnalyze()">TSLA</span> · 
+        <span style="color:#e8b84b;cursor:pointer" onclick="document.getElementById('fundSearchIn').value='NVDA';fundAnalyze()">NVDA</span> · 
+        <span style="color:#e8b84b;cursor:pointer" onclick="document.getElementById('fundSearchIn').value='MSFT';fundAnalyze()">MSFT</span> · 
+        <span style="color:#e8b84b;cursor:pointer" onclick="document.getElementById('fundSearchIn').value='META';fundAnalyze()">META</span>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<!-- END FUNDAMENTALS PANEL -->
+
 <!-- ── FOOTER ──────────────────────────────────────────────── -->
 <div class="footer">OPTIONS TERMINAL — Powered by Tradier &amp; Alpaca — Solo análisis técnico, no asesoramiento financiero</div>
 
@@ -2744,6 +3061,288 @@ window.switchMain=function(id,el){
 };
 
 // ═══════════════════════════════════════════════════════════
+// FUNDAMENTALS
+// ═══════════════════════════════════════════════════════════
+const FUND={sym:'',data:null,tab:'income',period:'annual',compSyms:[],charts:{},allAssets:[],assetsLoaded:false};
+const FUND_ASSETS_LIST=Object.keys(TICKER_PRICES).map(sym=>({sym,name:TICKER_NAMES[sym]||sym}));
+
+function fundGenData(sym){
+  const seed=(s,n=0)=>{let h=n;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))&0xffffffff;return Math.abs(h)/0xffffffff;};
+  const r=(a,b,n=0)=>+(a+(b-a)*seed(sym,n)).toFixed(2);
+  const baseRev=r(2,180,1)*1e9;const gRate=r(.04,.28,2);const gm=r(.25,.85,3);
+  const baseEPS=r(.5,15,6);const shares=r(.5,20,7)*1e9;
+  const price=TICKER_PRICES[sym]||r(10,400,8);
+  const years=[2025,2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2014];
+  const qtrs=['Q4 25','Q3 25','Q2 25','Q1 25','Q4 24','Q3 24','Q2 24','Q1 24'];
+
+  function genY(yr,idx){
+    const g=Math.pow(1+gRate,years[0]-yr);
+    const rev=Math.round(baseRev/g*(1+seed(sym,idx+20)*.1-.05));
+    const cogs=Math.round(rev*(1-gm));const gp=rev-cogs;
+    const rd=Math.round(rev*r(.05,.20,idx+30));const sga=Math.round(rev*r(.08,.25,idx+40));
+    const opex=rd+sga;const opInc=gp-opex;
+    const intExp=Math.round(rev*r(.005,.04,idx+50));const ebt=opInc-intExp;
+    const tax=Math.round(Math.max(0,ebt)*r(.10,.28,idx+60));const ni=ebt-tax;
+    const eps=+(ni/shares*10).toFixed(2);const sh=+(shares/1e9*(1+seed(sym,idx+70)*.02-.01)).toFixed(2);
+    const ebitda=Math.round(opInc+rev*r(.03,.08,idx+80));
+    return{yr,period:yr,rev,cogs,gp,rd,sga,opex,opInc,intExp,ebt,tax,ni,eps,epsD:+(eps*.98).toFixed(2),sh,ebitda,
+      gm:+(gp/rev*100).toFixed(2),om:+(opInc/rev*100).toFixed(2),nm:+(ni/rev*100).toFixed(2)};
+  }
+  function genQ(idx){
+    const rev=Math.round(baseRev/4*(1+seed(sym,idx+100)*.12-.06));
+    const cogs=Math.round(rev*(1-gm+seed(sym,idx+110)*.05));const gp=rev-cogs;
+    const rd=Math.round(rev*r(.05,.20,idx+120));const sga=Math.round(rev*r(.08,.25,idx+130));
+    const opex=rd+sga;const opInc=gp-opex;
+    const intExp=Math.round(rev*r(.005,.04,idx+140));const ebt=opInc-intExp;
+    const tax=Math.round(Math.max(0,ebt)*r(.10,.28,idx+150));const ni=ebt-tax;
+    const eps=+(ni/shares*10).toFixed(2);
+    return{yr:qtrs[idx],period:qtrs[idx],rev,cogs,gp,rd,sga,opex,opInc,intExp,ebt,tax,ni,eps,epsD:+(eps*.98).toFixed(2),sh:+(shares/1e9).toFixed(2),ebitda:Math.round(opInc+rev*.06),gm:+(gp/rev*100).toFixed(2),om:+(opInc/rev*100).toFixed(2),nm:+(ni/rev*100).toFixed(2)};
+  }
+  const annualInc=years.map((yr,i)=>genY(yr,i));
+  const qInc=qtrs.map((_,i)=>genQ(i));
+
+  function genBS(yr,idx){
+    const m=Math.pow(1+gRate*.5,years[0]-yr);
+    const cash=Math.round(baseRev*.15/m);const ar=Math.round(baseRev*.12/m);const inv=Math.round(baseRev*.08/m);
+    const ppe=Math.round(baseRev*.35/m);const gw=Math.round(baseRev*.2/m);
+    const totalAssets=cash+ar+inv+ppe+gw;
+    const stDebt=Math.round(baseRev*.06/m);const ltDebt=Math.round(baseRev*.18/m);
+    const ap=Math.round(baseRev*.09/m);const totalLiab=stDebt+ltDebt+ap+Math.round(baseRev*.05/m);
+    return{yr,period:yr,cash,ar,inv,ppe,goodwill:gw,totalAssets,stDebt,ltDebt,ap,totalLiab,equity:totalAssets-totalLiab};
+  }
+  const annualBS=years.map((yr,i)=>genBS(yr,i));
+
+  function genCF(yr,idx){
+    const ni=annualInc[idx].ni;
+    const dep=Math.round(baseRev*r(.03,.08,idx+200));const capex=Math.round(baseRev*r(.04,.12,idx+210));
+    const wc=Math.round((seed(sym,idx+215)-.4)*ni*.2);const opCF=ni+dep+wc;
+    const invCF=-capex+Math.round(wc*.3);const finCF=Math.round(-baseRev*r(.01,.05,idx+220));
+    return{yr,period:yr,opCF,invCF,finCF,capex,dep,fcf:opCF-capex};
+  }
+  const annualCF=years.map((yr,i)=>genCF(yr,i));
+
+  const pe=+(price/Math.max(.1,baseEPS)).toFixed(2);
+  const roe=+(annualInc[0].ni/Math.max(1,annualBS[0].equity)*100).toFixed(2);
+  const roa=+(annualInc[0].ni/Math.max(1,annualBS[0].totalAssets)*100).toFixed(2);
+  const debtEq=+(annualBS[0].ltDebt/Math.max(1,annualBS[0].equity)).toFixed(2);
+  const cr=+((annualBS[0].cash+annualBS[0].ar)/Math.max(1,annualBS[0].ap+annualBS[0].stDebt)).toFixed(2);
+  const hasDivs=seed(sym,300)>.45;
+  const divPerShare=hasDivs?+((price*r(.01,.05,301))).toFixed(2):0;
+  const divYield=hasDivs?+(divPerShare/price*100).toFixed(2):0;
+  const divGrowth=hasDivs?+r(1,12,302).toFixed(1):0;
+  const insts=['BlackRock Inc.','Vanguard Group','State Street Corp.','Fidelity Investments','T. Rowe Price','Geode Capital','Morgan Stanley','Goldman Sachs','JPMorgan Chase','Wellington Mgmt'];
+  const similar=Object.keys(TICKER_PRICES).filter(s=>s!==sym).sort(()=>seed(sym,800+s.charCodeAt(0))-.5).slice(0,10);
+  const descs={AAPL:'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. It also offers software, services, accessories, networking solutions, and third-party digital content. Apple was founded in 1976 and is headquartered in Cupertino, California.',TSLA:"Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems. It operates in two segments, Automotive, and Energy Generation and Storage. The company provides supercharger networks and self-driving capabilities.",NVDA:'NVIDIA Corporation provides graphics and compute solutions globally. Its products are used in gaming, professional visualization, datacenter, and automotive markets. It also designs system-on-chip units used in mobile computing and automotive markets.',MSFT:'Microsoft Corporation develops software, services, devices, and solutions worldwide. Its segments include Productivity and Business Processes, Intelligent Cloud, and More Personal Computing.',META:'Meta Platforms, Inc. develops products enabling people to connect and share through mobile devices, personal computers, and VR headsets. It operates in two segments: Family of Apps and Reality Labs.',DEFAULT:`${sym} operates as a publicly traded company providing products and services across its sector. The company has demonstrated consistent financial performance with strong fundamentals and growing market share.`};
+  const TICKER_NAMES2={AAPL:'Apple Inc.',TSLA:'Tesla, Inc.',NVDA:'NVIDIA Corporation',MSFT:'Microsoft Corporation',META:'Meta Platforms, Inc.',AMZN:'Amazon.com, Inc.',GOOGL:'Alphabet Inc.',AMD:'Advanced Micro Devices',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',DEFAULT:`${sym} Corporation`};
+  const sectors2={AAPL:'Technology',TSLA:'Consumer Disc. / EV',NVDA:'Semiconductors',MSFT:'Technology',META:'Communication Services',AMZN:'Consumer Discretionary',GOOGL:'Communication Services',AMD:'Semiconductors',SPY:'ETF',QQQ:'ETF',DEFAULT:'Technology'};
+
+  return{
+    sym,name:TICKER_NAMES2[sym]||TICKER_NAMES2.DEFAULT,sector:sectors2[sym]||sectors2.DEFAULT,
+    exchange:['SPY','QQQ','IWM'].includes(sym)?'NYSE ARCA':'NASDAQ',
+    price,price52Low:+(price*.62).toFixed(2),price52High:+(price*1.48).toFixed(2),
+    vol:Math.round((seed(sym,900)*50+5)*1e6),
+    desc:descs[sym]||descs.DEFAULT,similar,
+    metrics:{
+      marketCap:+(price*shares/1e9).toFixed(2)+'B',pe:pe<0?'N/A':pe,
+      eps:`$${baseEPS.toFixed(2)}`,pb:+(price*shares/(Math.max(1,annualBS[0].equity)/1e6)).toFixed(2),
+      divYield:divYield+'%',roe:roe+'%',debtEq,
+      fcfPerShare:+(annualCF[0].fcf/shares*1e6).toFixed(2)+'/sh',
+      revenue:fundFmt2(annualInc[0].rev),netIncome:fundFmt2(annualInc[0].ni),
+      beta:+(0.5+seed(sym,950)*1.8).toFixed(2),
+    },
+    income:{annual:annualInc,quarterly:qInc},
+    balanceSheet:{annual:annualBS},cashFlow:{annual:annualCF},
+    ratios:{pe,pb:+(price*shares/(Math.max(1,annualBS[0].equity)/1e6)).toFixed(2),ps:+(price*shares/(annualInc[0].rev/1e6)).toFixed(2),peg:+(pe/Math.max(.1,gRate*100/10)).toFixed(2),roe,roa,debtEq,cr,fcfYield:+(annualCF[0].fcf/(price*shares/1e9)*100).toFixed(2),evEbitda:+(pe*.8).toFixed(2),pfcf:+(price/(annualCF[0].fcf/shares*1e6)).toFixed(2),grossMargin:+(gm*100).toFixed(2),opMargin:+(annualInc[0].om).toFixed(2),netMargin:+(annualInc[0].nm).toFixed(2),revenueGrowth:+(gRate*100).toFixed(2),niGrowth:+(gRate*120).toFixed(2),currentRatio:cr,quickRatio:+(cr*.85).toFixed(2),interestCoverage:+(10+seed(sym,960)*20).toFixed(1),assetTurnover:+(0.3+seed(sym,970)*.8).toFixed(2),invTurnover:+(3+seed(sym,980)*8).toFixed(1)},
+    dividends:{hasDivs,divPerShare,divYield,payoutRatio:hasDivs?+(divPerShare/Math.max(.01,baseEPS)*100).toFixed(0):0,divGrowth,divHistory:hasDivs?years.slice(0,8).map((yr,i)=>({yr,div:+(divPerShare*Math.pow(1+divGrowth/100,-i)).toFixed(2)})):[],exDate:hasDivs?'Mar 15, 2026':'N/A',payDate:hasDivs?'Apr 1, 2026':'N/A',frequency:hasDivs?'Quarterly':'N/A',consecutive:hasDivs?Math.round(seed(sym,990)*20)+2:0},
+    holders:{institutional:insts.map((name,i)=>({name,pct:+(15-i*1.2+seed(sym,400+i)*3).toFixed(2),chg:+((seed(sym,500+i)-.5)*5).toFixed(2)})),insiders:['CEO','CFO','COO','Director A','Director B'].map((role,i)=>({name:role,pct:+r(.5,8,600+i).toFixed(2),chg:+((seed(sym,700+i)-.4)*3).toFixed(2)})),instPct:+(45+seed(sym,1000)*30).toFixed(1),insiderPct:+(1+seed(sym,1010)*12).toFixed(1)},
+    compSyms:[sym],priceHistory:Array.from({length:30},(_,i)=>+(price*(1+(seed(sym,1100+i)-.5)*.15)).toFixed(2))
+  };
+}
+function fundFmt2(n){if(!n&&n!==0)return'—';const a=Math.abs(n);const s=n<0?'-':'';if(a>=1e12)return s+(a/1e12).toFixed(2)+'T';if(a>=1e9)return s+(a/1e9).toFixed(2)+'B';if(a>=1e6)return s+(a/1e6).toFixed(0)+'M';return s+a.toLocaleString();}
+
+// Search
+function fundShowDrop(){const d=document.getElementById('fundSearchDrop');if(d){d.classList.add('open');fundRDropItems(FUND_ASSETS_LIST.slice(0,8));}}
+function fundHideDrop(){const d=document.getElementById('fundSearchDrop');if(d)d.classList.remove('open');}
+function fundOnSearch(q){const d=document.getElementById('fundSearchDrop');if(!d)return;d.classList.add('open');if(!q.trim()){fundRDropItems(FUND_ASSETS_LIST.slice(0,8));return;}const ql=q.toUpperCase();fundRDropItems([...FUND_ASSETS_LIST.filter(a=>a.sym.startsWith(ql)),...FUND_ASSETS_LIST.filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||a.name.toUpperCase().includes(ql)))].slice(0,12));}
+function fundRDropItems(items){const d=document.getElementById('fundSearchDrop');if(!d)return;d.innerHTML=items.map(a=>`<div class="fund-sdi" onmousedown="document.getElementById('fundSearchIn').value='${a.sym}';fundAnalyze()"><span class="fund-sdi-sym">${a.sym}</span><span class="fund-sdi-name">${a.name}</span></div>`).join('');}
+
+function fundAnalyze(){
+  const sym=(document.getElementById('fundSearchIn')?.value||'').trim().toUpperCase();
+  if(!sym)return;FUND.sym=sym;fundHideDrop();
+  ['fundCoHdr','fundDescWrap','fundSimilar','fundMetricsGrid','fundTabs','fundPeriodBar','fundChartsRow','fundBigCharts','fundTableWrap','fundRatiosGrid','fundDivSection','fundHoldersWrap','fundCompWrap'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.classList.remove('show');}});
+  document.getElementById('fundEmpty').style.display='none';
+  document.getElementById('fundLoading')?.classList.add('show');
+  setTimeout(()=>{FUND.data=fundGenData(sym);document.getElementById('fundLoading')?.classList.remove('show');fundRender();},800);
+}
+
+function fundRender(){
+  const d=FUND.data;if(!d)return;
+  const $ =id=>document.getElementById(id);
+  const hdr=$('fundCoHdr');hdr?.classList.add('show');if(hdr)hdr.style.display='';
+  const logo=$('fundLogo');if(logo){logo.textContent=d.sym.slice(0,2);logo.style.background='linear-gradient(135deg,#e8b84b,#c4963a)';}
+  $('fundCoName')&&($('fundCoName').textContent=d.name);
+  $('fundCoTags')&&($('fundCoTags').innerHTML=`<span class="fund-co-tag exchange">${d.sym}</span><span class="fund-co-tag exchange">${d.exchange}</span><span class="fund-co-tag">${d.sector}</span>`);
+  $('fundPrice')&&($('fundPrice').textContent=`$${d.price.toFixed(2)}`);
+  const chg=+((Math.random()-.4)*d.price*.02).toFixed(2);
+  const pc=$('fundPriceChg');if(pc){pc.textContent=`${chg>=0?'+':''}${chg} (${(chg/d.price*100).toFixed(2)}%)`;pc.className=`fund-price-chg ${chg>=0?'up':'dn'}`;}
+  $('fund52Low')&&($('fund52Low').textContent=`$${d.price52Low}`);
+  $('fund52High')&&($('fund52High').textContent=`$${d.price52High}`);
+  $('fund52Dot')&&($('fund52Dot').style.left=((d.price-d.price52Low)/(d.price52High-d.price52Low)*100).toFixed(0)+'%');
+  $('fundVolVal')&&($('fundVolVal').textContent=fundFmt2(d.vol));
+  fundDrawSparkline(d.priceHistory);
+  const dw=$('fundDescWrap');dw?.classList.add('show');if(dw)dw.style.display='';
+  $('fundDescText')&&($('fundDescText').textContent=d.desc);
+  const sim=$('fundSimilar');sim?.classList.add('show');if(sim)sim.style.display='';
+  $('fundSimilarList')&&($('fundSimilarList').innerHTML=d.similar.map(s=>`<button class="fund-sim-btn" onclick="document.getElementById('fundSearchIn').value='${s}';fundAnalyze()">${s}</button>`).join(''));
+  const mg=$('fundMetricsGrid');mg?.classList.add('show');if(mg)mg.style.display='grid';
+  const mItems=[{l:'MARKET CAP',v:d.metrics.marketCap},{l:'P/E RATIO',v:d.metrics.pe},{l:'EPS',v:d.metrics.eps},{l:'P/B RATIO',v:d.metrics.pb},{l:'DIV YIELD',v:d.metrics.divYield},{l:'ROE',v:d.metrics.roe},{l:'DEBT/EQUITY',v:d.metrics.debtEq},{l:'FREE CASH FLOW',v:d.metrics.fcfPerShare},{l:'REVENUE (TTM)',v:d.metrics.revenue},{l:'NET INCOME',v:d.metrics.netIncome},{l:'BETA',v:d.metrics.beta},{l:'SECTOR',v:d.sector}];
+  if(mg)mg.innerHTML=mItems.map(m=>`<div class="fund-metric-card"><div class="fund-mc-lbl">${m.l}</div><div class="fund-mc-val ${isNaN(m.v)?'neutral':''}">${m.v}</div></div>`).join('');
+  const tabs=$('fundTabs');tabs?.classList.add('show');if(tabs)tabs.style.display='flex';
+  FUND.tab='income';document.querySelectorAll('.fund-tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+  fundShowIncome();
+}
+function fundToggleDesc(){const t=$('fundDescText'),m=$('fundDescMore');if(!t||!m)return;t.classList.toggle('expanded');m.textContent=t.classList.contains('expanded')?'Ver menos ▴':'Ver más ▾';}
+function $f(id){return document.getElementById(id);}
+
+function fundSetTab(tab,el){
+  FUND.tab=tab;document.querySelectorAll('.fund-tab').forEach(t=>t.classList.remove('active'));if(el)el.classList.add('active');
+  const hideAll=()=>['fundChartsRow','fundBigCharts','fundTableWrap','fundRatiosGrid','fundDivSection','fundHoldersWrap','fundCompWrap'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.classList.remove('show');}});
+  hideAll();
+  const pb=$f('fundPeriodBar'),ps=$f('fundSectionTitle');
+  if(['income','balance','cashflow'].includes(tab)){
+    if(pb){pb.classList.add('show');pb.style.display='flex';}
+    const titles={income:'📊 Income Statement',balance:'⚖️ Balance Sheet',cashflow:'💵 Cash Flow'};
+    if(ps)ps.textContent=titles[tab]||'';
+    if(tab==='income')fundShowIncome();else if(tab==='balance')fundShowBalance();else fundShowCashFlow();
+  } else {
+    if(pb){pb.classList.remove('show');pb.style.display='none';}
+    if(tab==='ratios')fundShowRatios();else if(tab==='dividends')fundShowDividends();else if(tab==='holders')fundShowHolders();else if(tab==='comparator')fundShowComparator();
+  }
+}
+function fundSetPeriod(p,el){FUND.period=p;document.querySelectorAll('.fund-period-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');fundSetTab(FUND.tab,null);}
+
+let _fCharts={};
+function _fDC(id){if(_fCharts[id]){try{_fCharts[id].destroy();}catch(e){}delete _fCharts[id];}}
+function _fBar(id,data,labels,color,lbl){
+  _fDC(id);const cv=$f(id);if(!cv)return;
+  const pos=data.map(v=>v>=0?v:null),neg=data.map(v=>v<0?v:null);
+  _fCharts[id]=new Chart(cv,{type:'bar',data:{labels,datasets:[{data:pos,backgroundColor:color||'#e8b84b',borderRadius:2},{data:neg,backgroundColor:'#ef4444',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#334155',font:{size:7,family:'JetBrains Mono'},maxRotation:0,maxTicksLimit:7}},y:{grid:{color:'#111820',drawBorder:false},ticks:{color:'#334155',font:{size:7,family:'JetBrains Mono'}}}}}});
+}
+function _fLine(id,datasets,labels){
+  _fDC(id);const cv=$f(id);if(!cv)return;
+  _fCharts[id]=new Chart(cv,{type:'line',data:{labels,datasets:datasets.map(d=>({...d,tension:.3,pointRadius:2,borderWidth:1.5}))},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#64748b',font:{size:9,family:'JetBrains Mono'},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:'#334155',font:{size:7},maxRotation:0,maxTicksLimit:8}},y:{grid:{color:'#0d1117',drawBorder:false},ticks:{color:'#334155',font:{size:7}}}}}});
+}
+function _fGroup(id,datasets,labels){
+  _fDC(id);const cv=$f(id);if(!cv)return;
+  _fCharts[id]=new Chart(cv,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#64748b',font:{size:9,family:'JetBrains Mono'},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:'#334155',font:{size:7},maxRotation:0,maxTicksLimit:8}},y:{grid:{color:'#0d1117',drawBorder:false},ticks:{color:'#334155',font:{size:7},callback:v=>`$${v}B`}}}}});
+}
+
+function fundDrawSparkline(data){
+  _fDC('fundSparkline');const cv=$f('fundSparkline');if(!cv)return;
+  const up=data[data.length-1]>=data[0];
+  _fCharts['fundSparkline']=new Chart(cv,{type:'line',data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:up?'#22c55e':'#ef4444',borderWidth:1.5,pointRadius:0,tension:.3}]},options:{responsive:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
+}
+
+function _showCR(){const cr=$f('fundChartsRow'),bc=$f('fundBigCharts'),tw=$f('fundTableWrap');
+  if(cr){cr.classList.add('show');cr.style.display='grid';}if(bc){bc.classList.add('show');bc.style.display='grid';}if(tw){tw.classList.add('show');tw.style.display='block';}}
+function _fTbl(html){const t=$f('fundTable');if(t)t.innerHTML=html;}
+function _fRow(label,key,rows,bold,pct){const cls=bold?'total-row':'';const bc=bold?' style="font-weight:600;color:#c8d4e0"':'';return`<tr class="${cls}"><td${bc}>${label}</td>${rows.map(r=>{const v=r[key]??0;const neg=v<0;return`<td class="${neg?'neg':''}">${pct?(v+'%'):fundFmt2(v)}</td>`;}).join('')}</tr>`;}
+function _fSec(lbl,cols){return`<tr class="section-hdr"><td colspan="${cols+1}">${lbl}</td></tr>`;}
+
+function fundShowIncome(){
+  const d=FUND.data;if(!d)return;const rows=FUND.period==='annual'?d.income.annual:d.income.quarterly;const cols=rows.map(r=>r.period);
+  _showCR();
+  $f('fundChart2Title')&&($f('fundChart2Title').textContent='Revenue');$f('fundChart3Title')&&($f('fundChart3Title').textContent='Shares Outstanding');
+  _fBar('fundEpsChart',rows.map(r=>r.eps),cols,'#e8b84b','EPS');
+  _fBar('fundRevChart',rows.map(r=>+(r.rev/1e9).toFixed(2)),cols,'#3b82f6','Revenue B');
+  _fBar('fundSharesChart',rows.map(r=>r.sh),cols,'#a78bfa','Shares B');
+  $f('fundBigChart1Title')&&($f('fundBigChart1Title').textContent='📊 Revenue vs Net Income');
+  $f('fundBigChart2Title')&&($f('fundBigChart2Title').textContent='📈 Márgenes');
+  _fGroup('fundRevNetChart',[{label:'Revenue',data:rows.map(r=>+(r.rev/1e9).toFixed(2)),backgroundColor:'rgba(59,130,246,0.7)',borderRadius:2},{label:'Net Income',data:rows.map(r=>+(r.ni/1e9).toFixed(2)),backgroundColor:rows.map(r=>r.ni>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)'),borderRadius:2}],cols);
+  _fLine('fundMarginsChart',[{label:'Gross Margin',data:rows.map(r=>r.gm),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.08)',fill:true},{label:'Op. Margin',data:rows.map(r=>r.om),borderColor:'#3b82f6',backgroundColor:'transparent'},{label:'Net Margin',data:rows.map(r=>r.nm),borderColor:'#e8b84b',backgroundColor:'transparent'}],cols);
+  const n=cols.length;_fTbl(`<thead><tr><th>Concepto</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${_fSec('INGRESOS',n)}${_fRow('Revenue','rev',rows,true)}${_fRow('Cost of Revenue','cogs',rows)}${_fRow('Gross Profit','gp',rows,true)}${_fSec('GASTOS OPERATIVOS',n)}${_fRow('R&D Expenses','rd',rows)}${_fRow('SG&A Expenses','sga',rows)}${_fRow('Operating Expenses','opex',rows)}${_fRow('Operating Income','opInc',rows,true)}${_fSec('OTROS',n)}${_fRow('Interest Expense','intExp',rows)}${_fRow('Income Before Tax','ebt',rows)}${_fRow('Income Tax','tax',rows)}${_fRow('Net Income','ni',rows,true)}${_fSec('PER SHARE',n)}${_fRow('EPS','eps',rows)}${_fRow('EPS Diluted','epsD',rows)}${_fRow('Shares Outstanding (B)','sh',rows)}${_fSec('MÁRGENES',n)}${_fRow('Gross Margin','gm',rows,false,true)}${_fRow('Operating Margin','om',rows,false,true)}${_fRow('Net Margin','nm',rows,false,true)}${_fRow('EBITDA','ebitda',rows,true)}</tbody>`);
+}
+
+function fundShowBalance(){
+  const d=FUND.data;if(!d)return;const rows=d.balanceSheet.annual;const cols=rows.map(r=>r.period);
+  _showCR();
+  $f('fundChart2Title')&&($f('fundChart2Title').textContent='Total Assets');$f('fundChart3Title')&&($f('fundChart3Title').textContent='Total Equity');
+  _fBar('fundEpsChart',rows.map(r=>+(r.cash/1e9).toFixed(2)),cols,'#22c55e');
+  _fBar('fundRevChart',rows.map(r=>+(r.totalAssets/1e9).toFixed(2)),cols,'#3b82f6');
+  _fBar('fundSharesChart',rows.map(r=>+(r.equity/1e9).toFixed(2)),cols,'#a78bfa');
+  $f('fundBigChart1Title')&&($f('fundBigChart1Title').textContent='📊 Assets vs Liabilities');
+  $f('fundBigChart2Title')&&($f('fundBigChart2Title').textContent='📈 Deuda');
+  _fGroup('fundRevNetChart',[{label:'Total Assets',data:rows.map(r=>+(r.totalAssets/1e9).toFixed(2)),backgroundColor:'rgba(59,130,246,0.7)',borderRadius:2},{label:'Liabilities',data:rows.map(r=>+(r.totalLiab/1e9).toFixed(2)),backgroundColor:'rgba(239,68,68,0.6)',borderRadius:2},{label:'Equity',data:rows.map(r=>+(r.equity/1e9).toFixed(2)),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:2}],cols);
+  _fLine('fundMarginsChart',[{label:'LT Debt',data:rows.map(r=>+(r.ltDebt/1e9).toFixed(2)),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.08)',fill:true},{label:'ST Debt',data:rows.map(r=>+(r.stDebt/1e9).toFixed(2)),borderColor:'#f59e0b',backgroundColor:'transparent'},{label:'Cash',data:rows.map(r=>+(r.cash/1e9).toFixed(2)),borderColor:'#22c55e',backgroundColor:'transparent'}],cols);
+  const n=cols.length;_fTbl(`<thead><tr><th>Concepto</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${_fSec('ACTIVOS CORRIENTES',n)}${_fRow('Cash & Equivalents','cash',rows)}${_fRow('Accounts Receivable','ar',rows)}${_fRow('Inventory','inv',rows)}${_fSec('ACTIVOS NO CORRIENTES',n)}${_fRow('PP&E (Net)','ppe',rows)}${_fRow('Goodwill','goodwill',rows)}${_fRow('Total Assets','totalAssets',rows,true)}${_fSec('PASIVOS',n)}${_fRow('Accounts Payable','ap',rows)}${_fRow('Short-Term Debt','stDebt',rows)}${_fRow('Long-Term Debt','ltDebt',rows)}${_fRow('Total Liabilities','totalLiab',rows,true)}${_fSec('PATRIMONIO',n)}${_fRow('Total Equity','equity',rows,true)}</tbody>`);
+}
+
+function fundShowCashFlow(){
+  const d=FUND.data;if(!d)return;const rows=d.cashFlow.annual;const cols=rows.map(r=>r.period);
+  _showCR();
+  $f('fundChart2Title')&&($f('fundChart2Title').textContent='Investing CF');$f('fundChart3Title')&&($f('fundChart3Title').textContent='Free Cash Flow');
+  _fBar('fundEpsChart',rows.map(r=>+(r.opCF/1e9).toFixed(2)),cols,'#22c55e');
+  _fBar('fundRevChart',rows.map(r=>+(r.invCF/1e9).toFixed(2)),cols,'#ef4444');
+  _fBar('fundSharesChart',rows.map(r=>+(r.fcf/1e9).toFixed(2)),cols,'#e8b84b');
+  $f('fundBigChart1Title')&&($f('fundBigChart1Title').textContent='📊 Cash Flow Summary');
+  $f('fundBigChart2Title')&&($f('fundBigChart2Title').textContent='📈 CapEx vs FCF');
+  _fGroup('fundRevNetChart',[{label:'Operating CF',data:rows.map(r=>+(r.opCF/1e9).toFixed(2)),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:2},{label:'Investing CF',data:rows.map(r=>+(r.invCF/1e9).toFixed(2)),backgroundColor:'rgba(239,68,68,0.6)',borderRadius:2},{label:'Financing CF',data:rows.map(r=>+(r.finCF/1e9).toFixed(2)),backgroundColor:'rgba(167,139,250,0.6)',borderRadius:2}],cols);
+  _fLine('fundMarginsChart',[{label:'Free Cash Flow',data:rows.map(r=>+(r.fcf/1e9).toFixed(2)),borderColor:'#e8b84b',backgroundColor:'rgba(232,184,75,0.1)',fill:true},{label:'CapEx',data:rows.map(r=>+(r.capex/1e9).toFixed(2)),borderColor:'#ef4444',backgroundColor:'transparent',borderDash:[4,3]}],cols);
+  const n=cols.length;_fTbl(`<thead><tr><th>Concepto</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${_fSec('FLUJO OPERATIVO',n)}${_fRow('Operating Cash Flow','opCF',rows,true)}${_fRow('Depreciation','dep',rows)}${_fSec('FLUJO DE INVERSIÓN',n)}${_fRow('CapEx','capex',rows)}${_fRow('Investing Cash Flow','invCF',rows,true)}${_fSec('FLUJO FINANCIERO',n)}${_fRow('Financing Cash Flow','finCF',rows,true)}${_fSec('FREE CASH FLOW',n)}${_fRow('Free Cash Flow','fcf',rows,true)}</tbody>`);
+}
+
+function fundShowRatios(){
+  const d=FUND.data;if(!d)return;const rg=$f('fundRatiosGrid');rg?.classList.add('show');if(rg)rg.style.display='grid';
+  const r=d.ratios;
+  const card=(title,rows)=>`<div class="fund-ratio-section"><div class="fund-ratio-section-title">${title}</div>${rows.map(([l,v,cls])=>`<div class="fund-ratio-row"><span class="fund-ratio-lbl">${l}</span><span class="fund-ratio-val ${cls||''}">${v}</span></div>`).join('')}</div>`;
+  if(rg)rg.innerHTML=
+    card('Valoración',[['P/E Ratio',r.pe,r.pe<25?'green':r.pe>50?'red':''],['P/B Ratio',r.pb,r.pb<3?'green':''],['P/S Ratio',r.ps,''],['P/FCF',r.pfcf,''],['EV/EBITDA',r.evEbitda,''],['PEG Ratio',r.peg,r.peg<1?'green':r.peg>2?'red':'amber']])+
+    card('Rentabilidad',[['Gross Margin',r.grossMargin+'%',r.grossMargin>50?'green':r.grossMargin>30?'amber':'red'],['Operating Margin',r.opMargin+'%',r.opMargin>15?'green':''],['Net Margin',r.netMargin+'%',r.netMargin>10?'green':''],['ROE',r.roe+'%',r.roe>15?'green':''],['ROA',r.roa+'%',r.roa>8?'green':''],['FCF Yield',r.fcfYield+'%',r.fcfYield>5?'green':'']])+
+    card('Crecimiento',[['Revenue Growth',r.revenueGrowth+'%',r.revenueGrowth>15?'green':''],['Net Income Growth',r.niGrowth+'%',r.niGrowth>15?'green':r.niGrowth<0?'red':''],['EPS Growth',+(r.niGrowth*1.1).toFixed(2)+'%','']])+
+    card('Liquidez & Deuda',[['Current Ratio',r.currentRatio,r.currentRatio>2?'green':r.currentRatio<1?'red':'amber'],['Quick Ratio',r.quickRatio,r.quickRatio>1?'green':'amber'],['Debt/Equity',r.debtEq,r.debtEq<0.5?'green':r.debtEq>2?'red':'amber'],['Interest Coverage',r.interestCoverage+'x',r.interestCoverage>5?'green':''],['Asset Turnover',r.assetTurnover,''],['Inventory Turnover',r.invTurnover,'']]);
+}
+
+function fundShowDividends(){
+  const d=FUND.data;if(!d)return;const ds=$f('fundDivSection');ds?.classList.add('show');if(ds)ds.style.display='block';
+  const dh=$f('fundDivHeader');
+  if(!d.dividends.hasDivs){if(dh)dh.innerHTML=`<div class="fund-div-card" style="grid-column:1/-1;text-align:center;padding:30px"><div style="font-size:32px;margin-bottom:8px">💤</div><div style="color:#64748b;font-size:13px">${d.sym} actualmente no paga dividendos.</div></div>`;return;}
+  const divs=d.dividends;
+  if(dh)dh.innerHTML=[{l:'DIV / ACCIÓN',v:`$${divs.divPerShare}`},{l:'DIV YIELD',v:`${divs.divYield}%`},{l:'PAYOUT RATIO',v:`${divs.payoutRatio}%`},{l:'CRECIMIENTO (5Y)',v:`${divs.divGrowth}% CAGR`},{l:'EX-DATE',v:divs.exDate},{l:'PAY DATE',v:divs.payDate},{l:'FRECUENCIA',v:divs.frequency},{l:'AÑOS CONSECUTIVOS',v:divs.consecutive+' años'}].map(m=>`<div class="fund-div-card"><div class="fund-div-lbl">${m.l}</div><div class="fund-div-val">${m.v}</div></div>`).join('');
+  _fDC('fundDivChart');const cv=$f('fundDivChart');if(!cv)return;
+  _fCharts['fundDivChart']=new Chart(cv,{type:'bar',data:{labels:divs.divHistory.map(h=>h.yr),datasets:[{label:'Div/Acción',data:divs.divHistory.map(h=>h.div),backgroundColor:'rgba(232,184,75,0.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#334155',font:{size:8}}},y:{grid:{color:'#111820',drawBorder:false},ticks:{color:'#334155',font:{size:8},callback:v=>`$${v}`}}}}});
+}
+
+function fundShowHolders(){
+  const d=FUND.data;if(!d)return;const hw=$f('fundHoldersWrap');hw?.classList.add('show');if(hw)hw.style.display='block';
+  const hg=$f('fundHoldersGrid');if(!hg)return;
+  const maxI=d.holders.institutional[0]?.pct||1;
+  const instRows=d.holders.institutional.slice(0,10).map((h,i)=>`<div class="fund-holder-row"><span class="fund-holder-rank">${i+1}</span><span class="fund-holder-name" title="${h.name}">${h.name}</span><div class="fund-holder-bar"><div class="fund-holder-bar-fill" style="width:${(h.pct/maxI*100).toFixed(0)}%"></div></div><span class="fund-holder-pct">${h.pct}%</span><span style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${h.chg>=0?'#22c55e':'#ef4444'};margin-left:4px">${h.chg>=0?'+':''}${h.chg}%</span></div>`).join('');
+  const maxIns=d.holders.insiders[0]?.pct||1;
+  const insRows=d.holders.insiders.map((h,i)=>`<div class="fund-holder-row"><span class="fund-holder-rank">${i+1}</span><span class="fund-holder-name">${h.name}</span><div class="fund-holder-bar"><div class="fund-holder-bar-fill" style="width:${(h.pct/maxIns*100).toFixed(0)}%"></div></div><span class="fund-holder-pct">${h.pct}%</span><span style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${h.chg>=0?'#22c55e':'#ef4444'};margin-left:4px">${h.chg>=0?'+':''}${h.chg}%</span></div>`).join('');
+  hg.innerHTML=`<div style="grid-column:1/-1;display:flex;gap:10px;margin-bottom:10px"><div class="fund-ratio-section" style="flex:1"><div class="fund-ratio-section-title">PROPIEDAD INSTITUCIONAL</div><div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#e8b84b;margin-bottom:4px">${d.holders.instPct}%</div><div style="font-size:9px;color:#475569">de las acciones en circulación</div></div><div class="fund-ratio-section" style="flex:1"><div class="fund-ratio-section-title">PROPIEDAD DE INSIDERS</div><div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#3b82f6;margin-bottom:4px">${d.holders.insiderPct}%</div><div style="font-size:9px;color:#475569">de las acciones en circulación</div></div></div><div class="fund-holder-section"><div class="fund-holder-title">🏦 Top Institutional Holders</div>${instRows}</div><div class="fund-holder-section"><div class="fund-holder-title">👤 Insider Holdings</div>${insRows}</div>`;
+}
+
+function fundShowComparator(){
+  const cw=$f('fundCompWrap');cw?.classList.add('show');if(cw)cw.style.display='block';
+  if(!FUND.data)return;
+  if(!FUND.compSyms.includes(FUND.sym))FUND.compSyms=[FUND.sym];
+  fundBuildCompTable();
+}
+function fundAddComp(sym){const s=sym.trim().toUpperCase();if(!s)return;if(!FUND.compSyms.includes(s))FUND.compSyms.push(s);$f('fundCompIn').value='';fundBuildCompTable();}
+function fundRemoveComp(sym){FUND.compSyms=FUND.compSyms.filter(s=>s!==sym);fundBuildCompTable();}
+function fundBuildCompTable(){
+  const syms=FUND.compSyms.slice(0,6);
+  const chips=$f('fundCompChips');
+  if(chips)chips.innerHTML='<span style="font-size:10px;color:#475569;padding:4px 0">Compara con:</span>'+syms.slice(1).map(s=>`<div class="fund-comp-chip">${s}<button onclick="fundRemoveComp('${s}')">✕</button></div>`).join('');
+  const ds=syms.map(s=>fundGenData(s));
+  const t=$f('fundCompTable');if(!t)return;
+  const keys=[['Price','price'],['Market Cap','marketCap'],['P/E','pe'],['EPS','eps'],['Revenue','revenue'],['Net Income','netIncome'],['ROE','roe'],['Div Yield','divYield'],['Beta','beta']];
+  t.innerHTML=`<thead><tr><th>Métrica</th>${ds.map(d=>`<th style="color:#e8b84b">${d.sym}</th>`).join('')}</tr></thead><tbody>`+keys.map(([l,k])=>`<tr><td>${l}</td>${ds.map(d=>`<td style="color:#c8d4e0">${d.metrics?.[k]||d[k]||d.ratios?.[k]||'—'}</td>`).join('')}</tr>`).join('')+`</tbody>`;
+}
+
+const _origSM4=window.switchMain;
+window.switchMain=function(id,el){_origSM4(id,el);if(id==='fundamentals'){setTimeout(()=>{if(!FUND.allAssets.length)FUND.allAssets=FUND_ASSETS_LIST;},50);}};
+
 generateExpirations();
 generateImData();
 buildMetrics();
