@@ -2317,6 +2317,134 @@ input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
+// SHARED TICKER DATA (used by Sigma Builder, Market Scanner, Fundamentals)
+// ═══════════════════════════════════════════════════════════
+// ── API CONFIG (Tradier + Alpaca) ─────────────────────────────
+// These are filled via the API Config modal in the topbar
+const API_CONFIG={
+  tradier:{key:'',endpoint:'https://sandbox.tradier.com/v1',sandbox:true},
+  alpaca:{key:'',secret:'',endpoint:'https://data.alpaca.markets/v2',paper:true}
+};
+// Fetch real quote from Alpaca (fill API keys first)
+async function apiGetQuote(sym){
+  if(!API_CONFIG.alpaca.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.alpaca.endpoint}/stocks/${sym}/quotes/latest`,{headers:{'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret}});
+    const d=await r.json();return d?.quote||null;
+  }catch{return null;}
+}
+// Fetch option chain from Tradier
+async function apiGetOptionChain(sym,exp){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/options/chains?symbol=${sym}&expiration=${exp}&greeks=true`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
+    const d=await r.json();return d?.options?.option||null;
+  }catch{return null;}
+}
+// Fetch IV from Tradier
+async function apiGetIV(sym){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/history?symbol=${sym}&interval=daily&start=${new Date(Date.now()-90*86400000).toISOString().slice(0,10)}`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
+    const d=await r.json();return d?.history?.day||null;
+  }catch{return null;}
+}
+
+// ── EXPANDED TICKER DATABASE (100+ symbols) ────────────────────
+const TICKER_PRICES={
+  // Indices
+  SPX:7431,SPY:742,QQQ:500,IWM:210,DIA:422,VIX:14,
+  // Mega Cap Tech
+  AAPL:212,MSFT:430,GOOGL:179,META:567,AMZN:238,NVDA:138,TSLA:407,
+  // Large Cap Tech
+  AMD:163,INTC:21,QCOM:205,TXN:185,AVGO:235,MU:112,SMCI:45,
+  ORCL:185,CRM:335,ADBE:480,NOW:925,SNOW:185,PLTR:28,
+  SHOP:96,UBER:85,LYFT:14,ABNB:132,BABA:105,NFLX:1020,
+  RBLX:52,TWLO:75,DOCN:38,NET:125,DDOG:115,
+  // Finance
+  JPM:248,BAC:44,WFC:68,GS:565,MS:118,C:82,V:340,MA:525,
+  AXP:310,PYPL:68,SQ:58,HOOD:37,SOFI:11,COIN:245,
+  // Healthcare
+  JNJ:155,PFE:27,ABBV:192,MRK:128,BMY:48,LLY:780,
+  UNH:310,CVS:68,HCA:375,MRNA:38,BNTX:92,REGN:825,
+  // Energy
+  XOM:115,CVX:163,COP:126,SLB:42,OXY:58,PSX:145,
+  // Consumer
+  AMZN:238,WMT:95,TGT:125,COST:930,HD:385,LOW:235,
+  NKE:75,SBUX:85,MCD:308,DIS:115,NFLX:1020,
+  GME:22,AMC:3,
+  // EV/Crypto related
+  RIVN:13,NIO:4,LCID:3,F:12,GM:48,MSTR:382,
+  // ETFs
+  GLD:230,SLV:28,TLT:88,HYG:78,VTI:265,QQQ:500,ARKK:48,
+  SQQQ:18,TQQQ:82,UVXY:14,SPXL:145,
+  // Other popular
+  PLTR:28,BABA:105,JD:28,PDD:108,BILI:14,
+  XOM:115,CVX:163,BP:38,RIG:7
+};
+
+const TICKER_NAMES={
+  SPX:'S&P 500 Index',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',IWM:'iShares Russell 2000',
+  DIA:'SPDR Dow Jones ETF',VIX:'CBOE Volatility Index',
+  AAPL:'Apple Inc.',MSFT:'Microsoft Corporation',GOOGL:'Alphabet Inc.',META:'Meta Platforms Inc.',
+  AMZN:'Amazon.com Inc.',NVDA:'NVIDIA Corporation',TSLA:'Tesla, Inc.',
+  AMD:'Advanced Micro Devices',INTC:'Intel Corporation',QCOM:'Qualcomm Inc.',TXN:'Texas Instruments',
+  AVGO:'Broadcom Inc.',MU:'Micron Technology',SMCI:'Super Micro Computer',ORCL:'Oracle Corporation',
+  CRM:'Salesforce Inc.',ADBE:'Adobe Inc.',NOW:'ServiceNow Inc.',SNOW:'Snowflake Inc.',
+  PLTR:'Palantir Technologies',SHOP:'Shopify Inc.',UBER:'Uber Technologies',LYFT:'Lyft Inc.',
+  ABNB:'Airbnb Inc.',BABA:'Alibaba Group',NFLX:'Netflix Inc.',RBLX:'Roblox Corporation',
+  TWLO:'Twilio Inc.',DOCN:'DigitalOcean',NET:'Cloudflare Inc.',DDOG:'Datadog Inc.',
+  JPM:'JPMorgan Chase',BAC:'Bank of America',WFC:'Wells Fargo',GS:'Goldman Sachs',
+  MS:'Morgan Stanley',C:'Citigroup Inc.',V:'Visa Inc.',MA:'Mastercard Inc.',
+  AXP:'American Express',PYPL:'PayPal Holdings',SQ:'Block Inc.',HOOD:'Robinhood Markets',
+  SOFI:'SoFi Technologies',COIN:'Coinbase Global',
+  JNJ:'Johnson & Johnson',PFE:'Pfizer Inc.',ABBV:'AbbVie Inc.',MRK:'Merck & Co.',
+  BMY:'Bristol-Myers Squibb',LLY:'Eli Lilly & Co.',UNH:'UnitedHealth Group',
+  CVS:'CVS Health Corp.',HCA:'HCA Healthcare',MRNA:'Moderna Inc.',BNTX:'BioNTech SE',REGN:'Regeneron',
+  XOM:'Exxon Mobil Corp.',CVX:'Chevron Corporation',COP:'ConocoPhillips',
+  SLB:'SLB (Schlumberger)',OXY:'Occidental Petroleum',PSX:'Phillips 66',
+  WMT:'Walmart Inc.',TGT:'Target Corporation',COST:'Costco Wholesale',
+  HD:'Home Depot Inc.',LOW:'Lowes Companies',NKE:'Nike Inc.',SBUX:'Starbucks Corp.',
+  MCD:'McDonalds Corp.',DIS:'The Walt Disney Co.',GME:'GameStop Corp.',AMC:'AMC Entertainment',
+  RIVN:'Rivian Automotive',NIO:'NIO Inc.',LCID:'Lucid Group',F:'Ford Motor Co.',GM:'General Motors',
+  MSTR:'MicroStrategy Inc.',GLD:'SPDR Gold Shares',SLV:'iShares Silver Trust',
+  TLT:'iShares 20+ Year Treasury',HYG:'iShares HY Corp Bond',VTI:'Vanguard Total Stock',
+  ARKK:'ARK Innovation ETF',SQQQ:'ProShares UltraPro Short QQQ',TQQQ:'ProShares UltraPro QQQ',
+  UVXY:'ProShares Ultra VIX',SPXL:'Direxion Daily S&P 500 3x Bull',
+  JD:'JD.com Inc.',PDD:'PDD Holdings',BILI:'Bilibili Inc.',BP:'BP p.l.c.',RIG:'Transocean Ltd.'
+};
+
+// Get logo URL for ticker (uses Clearbit/alternatives)
+function getTickerLogo(sym){
+  const logos={
+    AAPL:'https://logo.clearbit.com/apple.com',
+    MSFT:'https://logo.clearbit.com/microsoft.com',
+    GOOGL:'https://logo.clearbit.com/google.com',
+    META:'https://logo.clearbit.com/meta.com',
+    AMZN:'https://logo.clearbit.com/amazon.com',
+    NVDA:'https://logo.clearbit.com/nvidia.com',
+    TSLA:'https://logo.clearbit.com/tesla.com',
+    AMD:'https://logo.clearbit.com/amd.com',
+    NFLX:'https://logo.clearbit.com/netflix.com',
+    JPM:'https://logo.clearbit.com/jpmorganchase.com',
+    BAC:'https://logo.clearbit.com/bankofamerica.com',
+    V:'https://logo.clearbit.com/visa.com',
+    MA:'https://logo.clearbit.com/mastercard.com',
+    COIN:'https://logo.clearbit.com/coinbase.com',
+    SHOP:'https://logo.clearbit.com/shopify.com',
+    UBER:'https://logo.clearbit.com/uber.com',
+    ABNB:'https://logo.clearbit.com/airbnb.com',
+    PYPL:'https://logo.clearbit.com/paypal.com',
+    DIS:'https://logo.clearbit.com/thewaltdisneycompany.com',
+    WMT:'https://logo.clearbit.com/walmart.com',
+    XOM:'https://logo.clearbit.com/exxonmobil.com',
+    PLTR:'https://logo.clearbit.com/palantir.com',
+  };
+  return logos[sym]||null;
+}
+
+
+// ═══════════════════════════════════════════════════════════
 // APP STATE
 // ═══════════════════════════════════════════════════════════
 const APP={
@@ -3518,132 +3646,6 @@ window.switchMain=function(id,el){
   _origSwitchMain3(id,el);
 };
 
-// ═══════════════════════════════════════════════════════════
-// SHARED TICKER DATA (used by Sigma Builder, Market Scanner, Fundamentals)
-// ═══════════════════════════════════════════════════════════
-// ── API CONFIG (Tradier + Alpaca) ─────────────────────────────
-// These are filled via the API Config modal in the topbar
-const API_CONFIG={
-  tradier:{key:'',endpoint:'https://sandbox.tradier.com/v1',sandbox:true},
-  alpaca:{key:'',secret:'',endpoint:'https://data.alpaca.markets/v2',paper:true}
-};
-// Fetch real quote from Alpaca (fill API keys first)
-async function apiGetQuote(sym){
-  if(!API_CONFIG.alpaca.key)return null;
-  try{
-    const r=await fetch(`${API_CONFIG.alpaca.endpoint}/stocks/${sym}/quotes/latest`,{headers:{'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret}});
-    const d=await r.json();return d?.quote||null;
-  }catch{return null;}
-}
-// Fetch option chain from Tradier
-async function apiGetOptionChain(sym,exp){
-  if(!API_CONFIG.tradier.key)return null;
-  try{
-    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/options/chains?symbol=${sym}&expiration=${exp}&greeks=true`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
-    const d=await r.json();return d?.options?.option||null;
-  }catch{return null;}
-}
-// Fetch IV from Tradier
-async function apiGetIV(sym){
-  if(!API_CONFIG.tradier.key)return null;
-  try{
-    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/history?symbol=${sym}&interval=daily&start=${new Date(Date.now()-90*86400000).toISOString().slice(0,10)}`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
-    const d=await r.json();return d?.history?.day||null;
-  }catch{return null;}
-}
-
-// ── EXPANDED TICKER DATABASE (100+ symbols) ────────────────────
-const TICKER_PRICES={
-  // Indices
-  SPX:7431,SPY:742,QQQ:500,IWM:210,DIA:422,VIX:14,
-  // Mega Cap Tech
-  AAPL:212,MSFT:430,GOOGL:179,META:567,AMZN:238,NVDA:138,TSLA:407,
-  // Large Cap Tech
-  AMD:163,INTC:21,QCOM:205,TXN:185,AVGO:235,MU:112,SMCI:45,
-  ORCL:185,CRM:335,ADBE:480,NOW:925,SNOW:185,PLTR:28,
-  SHOP:96,UBER:85,LYFT:14,ABNB:132,BABA:105,NFLX:1020,
-  RBLX:52,TWLO:75,DOCN:38,NET:125,DDOG:115,
-  // Finance
-  JPM:248,BAC:44,WFC:68,GS:565,MS:118,C:82,V:340,MA:525,
-  AXP:310,PYPL:68,SQ:58,HOOD:37,SOFI:11,COIN:245,
-  // Healthcare
-  JNJ:155,PFE:27,ABBV:192,MRK:128,BMY:48,LLY:780,
-  UNH:310,CVS:68,HCA:375,MRNA:38,BNTX:92,REGN:825,
-  // Energy
-  XOM:115,CVX:163,COP:126,SLB:42,OXY:58,PSX:145,
-  // Consumer
-  AMZN:238,WMT:95,TGT:125,COST:930,HD:385,LOW:235,
-  NKE:75,SBUX:85,MCD:308,DIS:115,NFLX:1020,
-  GME:22,AMC:3,
-  // EV/Crypto related
-  RIVN:13,NIO:4,LCID:3,F:12,GM:48,MSTR:382,
-  // ETFs
-  GLD:230,SLV:28,TLT:88,HYG:78,VTI:265,QQQ:500,ARKK:48,
-  SQQQ:18,TQQQ:82,UVXY:14,SPXL:145,
-  // Other popular
-  PLTR:28,BABA:105,JD:28,PDD:108,BILI:14,
-  XOM:115,CVX:163,BP:38,RIG:7
-};
-
-const TICKER_NAMES={
-  SPX:'S&P 500 Index',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',IWM:'iShares Russell 2000',
-  DIA:'SPDR Dow Jones ETF',VIX:'CBOE Volatility Index',
-  AAPL:'Apple Inc.',MSFT:'Microsoft Corporation',GOOGL:'Alphabet Inc.',META:'Meta Platforms Inc.',
-  AMZN:'Amazon.com Inc.',NVDA:'NVIDIA Corporation',TSLA:'Tesla, Inc.',
-  AMD:'Advanced Micro Devices',INTC:'Intel Corporation',QCOM:'Qualcomm Inc.',TXN:'Texas Instruments',
-  AVGO:'Broadcom Inc.',MU:'Micron Technology',SMCI:'Super Micro Computer',ORCL:'Oracle Corporation',
-  CRM:'Salesforce Inc.',ADBE:'Adobe Inc.',NOW:'ServiceNow Inc.',SNOW:'Snowflake Inc.',
-  PLTR:'Palantir Technologies',SHOP:'Shopify Inc.',UBER:'Uber Technologies',LYFT:'Lyft Inc.',
-  ABNB:'Airbnb Inc.',BABA:'Alibaba Group',NFLX:'Netflix Inc.',RBLX:'Roblox Corporation',
-  TWLO:'Twilio Inc.',DOCN:'DigitalOcean',NET:'Cloudflare Inc.',DDOG:'Datadog Inc.',
-  JPM:'JPMorgan Chase',BAC:'Bank of America',WFC:'Wells Fargo',GS:'Goldman Sachs',
-  MS:'Morgan Stanley',C:'Citigroup Inc.',V:'Visa Inc.',MA:'Mastercard Inc.',
-  AXP:'American Express',PYPL:'PayPal Holdings',SQ:'Block Inc.',HOOD:'Robinhood Markets',
-  SOFI:'SoFi Technologies',COIN:'Coinbase Global',
-  JNJ:'Johnson & Johnson',PFE:'Pfizer Inc.',ABBV:'AbbVie Inc.',MRK:'Merck & Co.',
-  BMY:'Bristol-Myers Squibb',LLY:'Eli Lilly & Co.',UNH:'UnitedHealth Group',
-  CVS:'CVS Health Corp.',HCA:'HCA Healthcare',MRNA:'Moderna Inc.',BNTX:'BioNTech SE',REGN:'Regeneron',
-  XOM:'Exxon Mobil Corp.',CVX:'Chevron Corporation',COP:'ConocoPhillips',
-  SLB:'SLB (Schlumberger)',OXY:'Occidental Petroleum',PSX:'Phillips 66',
-  WMT:'Walmart Inc.',TGT:'Target Corporation',COST:'Costco Wholesale',
-  HD:'Home Depot Inc.',LOW:'Lowe's Companies',NKE:'Nike Inc.',SBUX:'Starbucks Corp.',
-  MCD:'McDonald's Corp.',DIS:'The Walt Disney Co.',GME:'GameStop Corp.',AMC:'AMC Entertainment',
-  RIVN:'Rivian Automotive',NIO:'NIO Inc.',LCID:'Lucid Group',F:'Ford Motor Co.',GM:'General Motors',
-  MSTR:'MicroStrategy Inc.',GLD:'SPDR Gold Shares',SLV:'iShares Silver Trust',
-  TLT:'iShares 20+ Year Treasury',HYG:'iShares HY Corp Bond',VTI:'Vanguard Total Stock',
-  ARKK:'ARK Innovation ETF',SQQQ:'ProShares UltraPro Short QQQ',TQQQ:'ProShares UltraPro QQQ',
-  UVXY:'ProShares Ultra VIX',SPXL:'Direxion Daily S&P 500 3x Bull',
-  JD:'JD.com Inc.',PDD:'PDD Holdings',BILI:'Bilibili Inc.',BP:'BP p.l.c.',RIG:'Transocean Ltd.'
-};
-
-// Get logo URL for ticker (uses Clearbit/alternatives)
-function getTickerLogo(sym){
-  const logos={
-    AAPL:'https://logo.clearbit.com/apple.com',
-    MSFT:'https://logo.clearbit.com/microsoft.com',
-    GOOGL:'https://logo.clearbit.com/google.com',
-    META:'https://logo.clearbit.com/meta.com',
-    AMZN:'https://logo.clearbit.com/amazon.com',
-    NVDA:'https://logo.clearbit.com/nvidia.com',
-    TSLA:'https://logo.clearbit.com/tesla.com',
-    AMD:'https://logo.clearbit.com/amd.com',
-    NFLX:'https://logo.clearbit.com/netflix.com',
-    JPM:'https://logo.clearbit.com/jpmorganchase.com',
-    BAC:'https://logo.clearbit.com/bankofamerica.com',
-    V:'https://logo.clearbit.com/visa.com',
-    MA:'https://logo.clearbit.com/mastercard.com',
-    COIN:'https://logo.clearbit.com/coinbase.com',
-    SHOP:'https://logo.clearbit.com/shopify.com',
-    UBER:'https://logo.clearbit.com/uber.com',
-    ABNB:'https://logo.clearbit.com/airbnb.com',
-    PYPL:'https://logo.clearbit.com/paypal.com',
-    DIS:'https://logo.clearbit.com/thewaltdisneycompany.com',
-    WMT:'https://logo.clearbit.com/walmart.com',
-    XOM:'https://logo.clearbit.com/exxonmobil.com',
-    PLTR:'https://logo.clearbit.com/palantir.com',
-  };
-  return logos[sym]||null;
-}
 
 // ═══════════════════════════════════════════════════════════
 // FUNDAMENTALS
