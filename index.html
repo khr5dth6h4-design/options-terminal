@@ -1589,12 +1589,15 @@ input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
           <th onclick="mscSortColTbl('price')">Price ↕</th>
           <th onclick="mscSortColTbl('chg')">Change ↕</th>
           <th onclick="mscSortColTbl('iv')">IV% ↕</th>
+          <th onclick="mscSortColTbl('ivRank')">IV Rank ↕</th>
+          <th onclick="mscSortColTbl('hv20')">HV 20D ↕</th>
+          <th onclick="mscSortColTbl('rsi')">RSI ↕</th>
           <th onclick="mscSortColTbl('premium')">Premium ↕</th>
           <th onclick="mscSortColTbl('pop')">POP% ↕</th>
           <th onclick="mscSortColTbl('maxprofit')">Max Profit ↕</th>
-          <th onclick="mscSortColTbl('maxloss')">Max Loss ↕</th>
           <th onclick="mscSortColTbl('dte')">DTE ↕</th>
           <th onclick="mscSortColTbl('score')">Score ↕</th>
+          <th>Signals</th>
           <th>Action</th>
         </tr></thead>
         <tbody id="mscTableBody"></tbody>
@@ -2405,12 +2408,17 @@ async function loadAssets(){
     const d=await r.json();
     APP.allAssets=d.filter(a=>a.tradable&&a.symbol).map(a=>({sym:a.symbol,name:a.name||'',type:a.asset_class}));
     APP.assetsLoaded=true;
+    // Populate TICKER_NAMES with Alpaca data
+    APP.allAssets.forEach(a=>{if(!TICKER_NAMES[a.sym])TICKER_NAMES[a.sym]=a.name;});
     document.getElementById('dropStatus').textContent=`${APP.allAssets.length.toLocaleString()} activos cargados`;
   }catch{
-    APP.allAssets=getDefaultAssets();
+    // Fall back to TICKER_PRICES as default asset list
+    APP.allAssets=Object.keys(TICKER_PRICES).map(sym=>({sym,name:TICKER_NAMES[sym]||sym,type:'us_equity'}));
     APP.assetsLoaded=true;
-    document.getElementById('dropStatus').textContent=`${APP.allAssets.length} activos (demo — ingresa API Keys para todos)`;
+    document.getElementById('dropStatus').textContent=`${APP.allAssets.length} activos (demo — ingresa API Keys para acceso completo)`;
   }
+  // Sync to all search components
+  if(typeof sgbLoadAssets==='function')sgbLoadAssets();
 }
 function getDefaultAssets(){
   return [
@@ -2914,7 +2922,7 @@ function renderPred(){
 // ═══════════════════════════════════════════════════════════
 function openModal(){document.getElementById('modalOverlay').classList.add('open');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
-function saveTradier(){APP.tradierToken=document.getElementById('tradierKey').value;document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>Token guardado localmente';document.getElementById('tradierBadge').className='abadge ok';document.getElementById('tradierBadge').textContent='TRADIER ●';}
+function saveTradier(){APP.tradierToken=document.getElementById('tradierKey').value;API_CONFIG.tradier.key=APP.tradierToken;document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>Token guardado — Fundamentals y Options Chain listos';document.getElementById('tradierBadge').className='abadge ok';document.getElementById('tradierBadge').textContent='TRADIER ●';}
 function testTradier(){
   const st=document.getElementById('tradierStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
   const base=document.getElementById('tradierEnv').value==='live'?'https://api.tradier.com':'https://sandbox.tradier.com';
@@ -2922,7 +2930,7 @@ function testTradier(){
     .then(r=>r.json()).then(d=>{if(d.profile){st.innerHTML=`<span class="cfg-dot live"></span>Conectado: ${d.profile.name}`;document.getElementById('tradierBadge').className='abadge ok';}else st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Token inválido';})
     .catch(()=>st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error CORS — requiere proxy backend');
 }
-function saveAlpaca(){APP.alpacaKey=document.getElementById('alpacaKey').value;APP.alpacaSecret=document.getElementById('alpacaSecret').value;APP.alpacaEnv=document.getElementById('alpacaEnv').value;document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>Guardado — recargando activos...';document.getElementById('alpacaBadge').className='abadge ok';document.getElementById('alpacaBadge').textContent='ALPACA ●';loadAssets();}
+function saveAlpaca(){APP.alpacaKey=document.getElementById('alpacaKey').value;APP.alpacaSecret=document.getElementById('alpacaSecret').value;APP.alpacaEnv=document.getElementById('alpacaEnv').value;API_CONFIG.alpaca.key=APP.alpacaKey;API_CONFIG.alpaca.secret=APP.alpacaSecret;API_CONFIG.alpaca.paper=APP.alpacaEnv==='paper';document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>Guardado — recargando activos...';document.getElementById('alpacaBadge').className='abadge ok';document.getElementById('alpacaBadge').textContent='ALPACA ●';loadAssets();}
 function testAlpaca(){
   const st=document.getElementById('alpacaStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
   const base=document.getElementById('alpacaEnv').value==='paper'?'https://paper-api.alpaca.markets':'https://api.alpaca.markets';
@@ -3120,6 +3128,13 @@ const MSC={
 };
 
 // Universe of tickers with metadata
+// MSC_UNIVERSE built from TICKER_PRICES for consistency
+function buildMscUniverse(){
+  const sectors={AAPL:'tech',TSLA:'ev',NVDA:'semiconductors',MSFT:'tech',META:'tech',AMZN:'consumer',GOOGL:'tech',AMD:'semiconductors',SPY:'etf',QQQ:'etf',IWM:'etf',NFLX:'tech',JPM:'finance',BAC:'finance',GS:'finance',V:'finance',MA:'finance',COIN:'crypto',MSTR:'crypto',XOM:'energy',CVX:'energy',LLY:'healthcare',UNH:'healthcare',MRNA:'healthcare',GME:'consumer',AMC:'consumer',RIVN:'ev',NIO:'ev',PLTR:'tech',SOFI:'fintech',HOOD:'fintech',PYPL:'fintech',SQ:'fintech',INTC:'semiconductors',MU:'semiconductors',SHOP:'tech',UBER:'tech',ABNB:'consumer',BABA:'tech'};
+  const ivMap={AAPL:28,TSLA:53,NVDA:61,MSFT:22,META:35,AMZN:31,GOOGL:29,AMD:58,SPY:14,QQQ:18,IWM:22,NFLX:38,JPM:26,BAC:31,GS:28,V:20,MA:21,COIN:78,MSTR:95,XOM:24,CVX:22,LLY:35,UNH:41,MRNA:68,GME:110,AMC:130,RIVN:82,NIO:88,PLTR:72,SOFI:65,HOOD:70,PYPL:52,SQ:62,INTC:55,MU:48,SHOP:58,UBER:42,ABNB:44,BABA:45};
+  const volMap={AAPL:82000000,TSLA:68000000,NVDA:220000000,MSFT:21000000,META:19000000,AMZN:45000000,GOOGL:25000000,AMD:55000000,SPY:68000000,QQQ:42000000,IWM:38000000,NFLX:5000000,JPM:11000000,BAC:55000000,GS:4000000,V:8000000,MA:5000000,COIN:12000000,MSTR:9000000,XOM:14000000,CVX:8000000,LLY:3000000,UNH:4000000,MRNA:9000000,GME:8000000,AMC:16000000,RIVN:28000000,NIO:42000000,PLTR:85000000,SOFI:32000000,HOOD:21000000,PYPL:15000000,SQ:11000000,INTC:35000000,MU:22000000,SHOP:14000000,UBER:19000000,ABNB:7000000,BABA:22000000};
+  return Object.keys(TICKER_PRICES).filter(sym=>sym!=='VIX'&&sym!=='DIA').map(sym=>({sym,name:TICKER_NAMES[sym]||sym,sector:sectors[sym]||'tech',price:TICKER_PRICES[sym]||100,iv:ivMap[sym]||Math.round(20+Math.abs(Math.sin(sym.charCodeAt(0)*7))*60),vol:volMap[sym]||5000000}));
+}
 const MSC_UNIVERSE=[
   {sym:'AAPL',name:'Apple Inc.',sector:'tech',price:212.5,iv:28,vol:82000000},
   {sym:'TSLA',name:'Tesla, Inc.',sector:'ev',price:407.1,iv:53,vol:68000000},
@@ -3163,12 +3178,65 @@ const MSC_UNIVERSE=[
   {sym:'WMT',name:'Walmart Inc.',sector:'consumer',price:95.0,iv:18,vol:12000000},
 ];
 
-// Sigma score calculation
+// ── MARKET SCANNER ENHANCEMENTS ─────────────────────────────
+// Calculate simulated HV20, RSI, IV Rank, signals
+function mscCalcHV20(sym,price){
+  const seed=Math.abs(Math.sin(sym.charCodeAt(0)*17+price*.03));
+  return Math.round(12+seed*80); // HV20 range 12-92%
+}
+function mscCalcRSI(sym,price){
+  const seed=Math.abs(Math.cos(sym.charCodeAt(0)*13+price*.07));
+  return Math.round(22+seed*56); // RSI range 22-78
+}
+function mscCalcIVRank(sym,iv){
+  const seed=Math.abs(Math.sin(sym.charCodeAt(0)*7+iv*.11));
+  return Math.round(5+seed*90); // IVR 5-95
+}
+function mscCalcIVPct(sym,iv){
+  const seed=Math.abs(Math.cos(sym.charCodeAt(0)*11+iv*.09));
+  return Math.round(5+seed*90);
+}
+function mscGetRSIState(rsi){
+  if(rsi>=70)return{label:'Overbought',color:'#ef4444'};
+  if(rsi<=30)return{label:'Oversold',color:'#22c55e'};
+  if(rsi>=55)return{label:'Bullish',color:'#f59e0b'};
+  if(rsi<=45)return{label:'Bearish',color:'#f59e0b'};
+  return{label:'Neutral',color:'#64748b'};
+}
+function mscGetSignals(strat,rsi,iv,ivRank,hv20){
+  const signals=[];
+  const ivHV=Math.round(iv/Math.max(hv20,1)*100);
+  if(ivRank>60)signals.push({text:'High IV Rank',icon:'🔥',color:'#22c55e'});
+  if(ivHV>120)signals.push({text:'IV > HV',icon:'📈',color:'#22c55e'});
+  if(ivHV<80)signals.push({text:'IV < HV',icon:'📉',color:'#f59e0b'});
+  if(['iron_condor','iron_butterfly','covered_calls','cash_secured_puts','bull_put_spread','bear_call_spread'].includes(strat)){
+    if(ivRank>50)signals.push({text:'Sell Premium ✓',icon:'💰',color:'#22c55e'});
+  }
+  if(['long_calls'].includes(strat)){
+    if(rsi<45)signals.push({text:'Oversold Setup',icon:'🚀',color:'#3b82f6'});
+    if(ivRank<30)signals.push({text:'Low IV Entry',icon:'✅',color:'#22c55e'});
+  }
+  if(['long_puts'].includes(strat)){
+    if(rsi>65)signals.push({text:'Overbought Setup',icon:'🐻',color:'#ef4444'});
+  }
+  if(strat==='iron_condor'&&rsi>40&&rsi<60)signals.push({text:'RSI Neutral Zone',icon:'⚡',color:'#22c55e'});
+  return signals.slice(0,3);
+}
+function mscLogoHTML(sym,size=28){
+  const url=getTickerLogo(sym);
+  const letter=sym.slice(0,2);
+  const colors=['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16'];
+  const color=colors[sym.charCodeAt(0)%colors.length];
+  if(url)return `<img src="${url}" onerror="this.parentElement.innerHTML='<div style=\"width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*.38)}px;font-weight:700;color:#fff;flex-shrink:0\">${letter}</div>'" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="${sym}">`;
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*.38)}px;font-weight:700;color:#fff;flex-shrink:0">${letter}</div>`;
+}
 function mscCalcScore(sym,strat,iv,price,vol){
-  const ivScore=Math.min(iv/100*40,40);
+  const ivScore=Math.min(iv/100*30,30);
   const volScore=Math.min(vol/5000000*20,20);
-  const seed=Math.abs(Math.sin(sym.charCodeAt(0)*31+price))*20;
-  return Math.min(98,Math.round(ivScore+volScore+seed+10));
+  const ivRank=mscCalcIVRank(sym,iv);
+  const ivRankScore=Math.min(ivRank/100*30,30);
+  const seed=Math.abs(Math.sin(sym.charCodeAt(0)*31+price))*10;
+  return Math.min(98,Math.round(ivScore+volScore+ivRankScore+seed+5));
 }
 
 // Generate synthetic option strategy result
@@ -3218,7 +3286,8 @@ function mscGenResult(ticker,strat){
 
   const score=mscCalcScore(sym,strat,iv,price,vol);
   const chg=+((Math.random()-.4)*price*.03).toFixed(2);
-  return{sym,name,sector,price,iv,vol,dte,legs,premium:+premium.toFixed(2),maxProfit:+maxProfit.toFixed(0),maxLoss:+maxLoss.toFixed(0),pop,score,bes,chg};
+  const hv20=mscCalcHV20(sym,price);const rsi=mscCalcRSI(sym,price);const ivRank=mscCalcIVRank(sym,iv);const ivPct=mscCalcIVPct(sym,iv);const signals=mscGetSignals(strat,rsi,iv,ivRank,hv20);
+  return{sym,name,sector,price,iv,vol,dte,legs,premium:+premium.toFixed(2),maxProfit:+maxProfit.toFixed(0),maxLoss:+maxLoss.toFixed(0),pop,score,bes,chg,hv20,rsi,ivRank,ivPct,signals};
 }
 
 // Filter results
@@ -3243,8 +3312,8 @@ function mscFilter(results){
 }
 
 // Scan functions
-function mscQuickScan(){mscRunScan(MSC_UNIVERSE.slice(0,20));}
-function mscFullScan(){mscRunScan(MSC_UNIVERSE);}
+function mscQuickScan(){mscRunScan(buildMscUniverse().slice(0,20));}
+function mscFullScan(){mscRunScan(buildMscUniverse());}
 
 function mscRunScan(universe){
   if(!MSC.strat){alert('Selecciona una estrategia primero');return;}
@@ -3289,18 +3358,39 @@ function mscRenderCards(){
     const chgUp=r.chg>=0;
     const prem=r.premium>0?`<span style="color:#22c55e">+$${r.premium}</span>`:`<span style="color:#ef4444">-$${Math.abs(r.premium)}</span>`;
     const mp=r.maxProfit>999999?'∞':r.maxProfit<0?'—':`$${r.maxProfit.toLocaleString()}`;
-    const ml=r.maxLoss<0?`$${Math.abs(r.maxLoss).toLocaleString()}`:'—';
-    return `<div class="msc-card" onclick="mscShowDetail(${i})">
-      <div><div class="msc-card-sym">${r.sym}</div><div class="msc-card-name">${r.name}</div><div style="margin-top:3px"><span style="font-size:8px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px;font-family:'JetBrains Mono',monospace">${r.sector}</span></div></div>
+    const rsiState=mscGetRSIState(r.rsi||50);
+    const ivVsHV=r.hv20?Math.round((r.iv/r.hv20)*100):100;
+    const sigHtml=(r.signals||[]).map(s=>`<span style="font-size:8px;color:${s.color};background:${s.color}18;border:1px solid ${s.color}44;border-radius:3px;padding:1px 6px;white-space:nowrap">${s.icon} ${s.text}</span>`).join('');
+    return `<div class="msc-card" onclick="mscShowDetail(${i})" style="grid-template-columns:auto 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${mscLogoHTML(r.sym,32)}
+        <div><div class="msc-card-sym">${r.sym}</div><div class="msc-card-name" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</div><div style="margin-top:3px"><span style="font-size:7px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px;font-family:'JetBrains Mono',monospace">${r.sector}</span></div></div>
+      </div>
       <div><div style="font-size:8px;color:#334155;margin-bottom:2px">Price</div><div class="msc-card-price">$${r.price.toLocaleString()}</div><div class="msc-card-chg ${chgUp?'up':'dn'}">${chgUp?'+':''}${r.chg} (${(r.chg/r.price*100).toFixed(1)}%)</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">IV%</div><div class="msc-card-metric-val amber">${r.iv}%</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Premium</div><div class="msc-card-metric-val" style="font-size:11px">${prem}</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">POP%</div><div class="msc-card-metric-val green">${r.pop}%</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Max Profit</div><div class="msc-card-metric-val green">${mp}</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">DTE</div><div class="msc-card-metric-val cyan">${r.dte}d</div></div>
+      <div class="msc-card-metric">
+        <div class="msc-card-metric-lbl">IV% / HV20</div>
+        <div class="msc-card-metric-val amber">${r.iv}% <span style="color:#475569;font-size:9px">/ ${r.hv20||'—'}%</span></div>
+        <div style="font-size:8px;color:${ivVsHV>120?'#22c55e':ivVsHV<80?'#ef4444':'#64748b'};margin-top:1px">IV/HV: ${ivVsHV}%</div>
+      </div>
+      <div class="msc-card-metric">
+        <div class="msc-card-metric-lbl">IV Rank / IVP</div>
+        <div class="msc-card-metric-val" style="color:${(r.ivRank||0)>60?'#22c55e':(r.ivRank||0)<30?'#ef4444':'#f59e0b'}">${r.ivRank||'—'}%</div>
+        <div style="font-size:8px;color:#475569;margin-top:1px">IVP: ${r.ivPct||'—'}%</div>
+      </div>
+      <div class="msc-card-metric">
+        <div class="msc-card-metric-lbl">RSI (14)</div>
+        <div class="msc-card-metric-val" style="color:${rsiState.color}">${r.rsi||'—'}</div>
+        <div style="font-size:8px;color:${rsiState.color};margin-top:1px">${rsiState.label}</div>
+      </div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Premium / POP</div><div class="msc-card-metric-val" style="font-size:11px">${prem}</div><div style="font-size:9px;color:#22c55e;margin-top:1px">POP: ${r.pop}%</div></div>
+      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Max Profit / DTE</div><div class="msc-card-metric-val green" style="font-size:11px">${mp}</div><div style="font-size:9px;color:#3b82f6;margin-top:1px">${r.dte}d exp</div></div>
+      <div style="grid-column:span 1">
+        <div style="font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Signals</div>
+        <div style="display:flex;flex-direction:column;gap:3px">${sigHtml||'<span style="font-size:8px;color:#334155">—</span>'}</div>
+      </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
         <div class="msc-card-score ${sc}">${r.score}</div>
-        <div class="msc-card-action">Trade →</div>
+        <div class="msc-card-action" onclick="event.stopPropagation();mscShowDetail(${i})">Trade →</div>
       </div>
     </div>`;
   }).join('');
@@ -3431,8 +3521,129 @@ window.switchMain=function(id,el){
 // ═══════════════════════════════════════════════════════════
 // SHARED TICKER DATA (used by Sigma Builder, Market Scanner, Fundamentals)
 // ═══════════════════════════════════════════════════════════
-const TICKER_PRICES={SPX:7431,SPY:742,QQQ:500,TSLA:407,AAPL:212,NVDA:138,MSFT:430,AMZN:238,META:567,GOOGL:360,AMD:163,NFLX:1020,GME:22,PLTR:28,COIN:245,IWM:210,GLD:230,XOM:115,JPM:248,INTC:21,MU:112,SMCI:45,SHOP:96,UBER:85,ABNB:132,BABA:105,PYPL:68,SQ:58,RIVN:13,NIO:4,MRNA:38,LLY:780,UNH:310,BAC:44,CVX:163,MSTR:382,SOFI:11,HOOD:37,AMC:3};
-const TICKER_NAMES={SPX:'S&P 500 Index',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',TSLA:'Tesla, Inc.',AAPL:'Apple Inc.',NVDA:'NVIDIA Corporation',MSFT:'Microsoft Corporation',AMZN:'Amazon.com Inc.',META:'Meta Platforms Inc.',GOOGL:'Alphabet Inc.',AMD:'Advanced Micro Devices',NFLX:'Netflix Inc.',GME:'GameStop Corp.',PLTR:'Palantir Technologies',COIN:'Coinbase Global',IWM:'iShares Russell 2000',GLD:'SPDR Gold Shares',XOM:'Exxon Mobil Corp.',JPM:'JPMorgan Chase',INTC:'Intel Corporation',MU:'Micron Technology',SMCI:'Super Micro Computer',SHOP:'Shopify Inc.',UBER:'Uber Technologies',ABNB:'Airbnb Inc.',BABA:'Alibaba Group',PYPL:'PayPal Holdings',SQ:'Block Inc.',RIVN:'Rivian Automotive',NIO:'NIO Inc.',MRNA:'Moderna Inc.',LLY:'Eli Lilly & Co.',UNH:'UnitedHealth Group',BAC:'Bank of America',CVX:'Chevron Corporation',MSTR:'MicroStrategy Inc.',SOFI:'SoFi Technologies',HOOD:'Robinhood Markets',AMC:'AMC Entertainment'};
+// ── API CONFIG (Tradier + Alpaca) ─────────────────────────────
+// These are filled via the API Config modal in the topbar
+const API_CONFIG={
+  tradier:{key:'',endpoint:'https://sandbox.tradier.com/v1',sandbox:true},
+  alpaca:{key:'',secret:'',endpoint:'https://data.alpaca.markets/v2',paper:true}
+};
+// Fetch real quote from Alpaca (fill API keys first)
+async function apiGetQuote(sym){
+  if(!API_CONFIG.alpaca.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.alpaca.endpoint}/stocks/${sym}/quotes/latest`,{headers:{'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret}});
+    const d=await r.json();return d?.quote||null;
+  }catch{return null;}
+}
+// Fetch option chain from Tradier
+async function apiGetOptionChain(sym,exp){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/options/chains?symbol=${sym}&expiration=${exp}&greeks=true`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
+    const d=await r.json();return d?.options?.option||null;
+  }catch{return null;}
+}
+// Fetch IV from Tradier
+async function apiGetIV(sym){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/history?symbol=${sym}&interval=daily&start=${new Date(Date.now()-90*86400000).toISOString().slice(0,10)}`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
+    const d=await r.json();return d?.history?.day||null;
+  }catch{return null;}
+}
+
+// ── EXPANDED TICKER DATABASE (100+ symbols) ────────────────────
+const TICKER_PRICES={
+  // Indices
+  SPX:7431,SPY:742,QQQ:500,IWM:210,DIA:422,VIX:14,
+  // Mega Cap Tech
+  AAPL:212,MSFT:430,GOOGL:179,META:567,AMZN:238,NVDA:138,TSLA:407,
+  // Large Cap Tech
+  AMD:163,INTC:21,QCOM:205,TXN:185,AVGO:235,MU:112,SMCI:45,
+  ORCL:185,CRM:335,ADBE:480,NOW:925,SNOW:185,PLTR:28,
+  SHOP:96,UBER:85,LYFT:14,ABNB:132,BABA:105,NFLX:1020,
+  RBLX:52,TWLO:75,DOCN:38,NET:125,DDOG:115,
+  // Finance
+  JPM:248,BAC:44,WFC:68,GS:565,MS:118,C:82,V:340,MA:525,
+  AXP:310,PYPL:68,SQ:58,HOOD:37,SOFI:11,COIN:245,
+  // Healthcare
+  JNJ:155,PFE:27,ABBV:192,MRK:128,BMY:48,LLY:780,
+  UNH:310,CVS:68,HCA:375,MRNA:38,BNTX:92,REGN:825,
+  // Energy
+  XOM:115,CVX:163,COP:126,SLB:42,OXY:58,PSX:145,
+  // Consumer
+  AMZN:238,WMT:95,TGT:125,COST:930,HD:385,LOW:235,
+  NKE:75,SBUX:85,MCD:308,DIS:115,NFLX:1020,
+  GME:22,AMC:3,
+  // EV/Crypto related
+  RIVN:13,NIO:4,LCID:3,F:12,GM:48,MSTR:382,
+  // ETFs
+  GLD:230,SLV:28,TLT:88,HYG:78,VTI:265,QQQ:500,ARKK:48,
+  SQQQ:18,TQQQ:82,UVXY:14,SPXL:145,
+  // Other popular
+  PLTR:28,BABA:105,JD:28,PDD:108,BILI:14,
+  XOM:115,CVX:163,BP:38,RIG:7
+};
+
+const TICKER_NAMES={
+  SPX:'S&P 500 Index',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',IWM:'iShares Russell 2000',
+  DIA:'SPDR Dow Jones ETF',VIX:'CBOE Volatility Index',
+  AAPL:'Apple Inc.',MSFT:'Microsoft Corporation',GOOGL:'Alphabet Inc.',META:'Meta Platforms Inc.',
+  AMZN:'Amazon.com Inc.',NVDA:'NVIDIA Corporation',TSLA:'Tesla, Inc.',
+  AMD:'Advanced Micro Devices',INTC:'Intel Corporation',QCOM:'Qualcomm Inc.',TXN:'Texas Instruments',
+  AVGO:'Broadcom Inc.',MU:'Micron Technology',SMCI:'Super Micro Computer',ORCL:'Oracle Corporation',
+  CRM:'Salesforce Inc.',ADBE:'Adobe Inc.',NOW:'ServiceNow Inc.',SNOW:'Snowflake Inc.',
+  PLTR:'Palantir Technologies',SHOP:'Shopify Inc.',UBER:'Uber Technologies',LYFT:'Lyft Inc.',
+  ABNB:'Airbnb Inc.',BABA:'Alibaba Group',NFLX:'Netflix Inc.',RBLX:'Roblox Corporation',
+  TWLO:'Twilio Inc.',DOCN:'DigitalOcean',NET:'Cloudflare Inc.',DDOG:'Datadog Inc.',
+  JPM:'JPMorgan Chase',BAC:'Bank of America',WFC:'Wells Fargo',GS:'Goldman Sachs',
+  MS:'Morgan Stanley',C:'Citigroup Inc.',V:'Visa Inc.',MA:'Mastercard Inc.',
+  AXP:'American Express',PYPL:'PayPal Holdings',SQ:'Block Inc.',HOOD:'Robinhood Markets',
+  SOFI:'SoFi Technologies',COIN:'Coinbase Global',
+  JNJ:'Johnson & Johnson',PFE:'Pfizer Inc.',ABBV:'AbbVie Inc.',MRK:'Merck & Co.',
+  BMY:'Bristol-Myers Squibb',LLY:'Eli Lilly & Co.',UNH:'UnitedHealth Group',
+  CVS:'CVS Health Corp.',HCA:'HCA Healthcare',MRNA:'Moderna Inc.',BNTX:'BioNTech SE',REGN:'Regeneron',
+  XOM:'Exxon Mobil Corp.',CVX:'Chevron Corporation',COP:'ConocoPhillips',
+  SLB:'SLB (Schlumberger)',OXY:'Occidental Petroleum',PSX:'Phillips 66',
+  WMT:'Walmart Inc.',TGT:'Target Corporation',COST:'Costco Wholesale',
+  HD:'Home Depot Inc.',LOW:'Lowe's Companies',NKE:'Nike Inc.',SBUX:'Starbucks Corp.',
+  MCD:'McDonald's Corp.',DIS:'The Walt Disney Co.',GME:'GameStop Corp.',AMC:'AMC Entertainment',
+  RIVN:'Rivian Automotive',NIO:'NIO Inc.',LCID:'Lucid Group',F:'Ford Motor Co.',GM:'General Motors',
+  MSTR:'MicroStrategy Inc.',GLD:'SPDR Gold Shares',SLV:'iShares Silver Trust',
+  TLT:'iShares 20+ Year Treasury',HYG:'iShares HY Corp Bond',VTI:'Vanguard Total Stock',
+  ARKK:'ARK Innovation ETF',SQQQ:'ProShares UltraPro Short QQQ',TQQQ:'ProShares UltraPro QQQ',
+  UVXY:'ProShares Ultra VIX',SPXL:'Direxion Daily S&P 500 3x Bull',
+  JD:'JD.com Inc.',PDD:'PDD Holdings',BILI:'Bilibili Inc.',BP:'BP p.l.c.',RIG:'Transocean Ltd.'
+};
+
+// Get logo URL for ticker (uses Clearbit/alternatives)
+function getTickerLogo(sym){
+  const logos={
+    AAPL:'https://logo.clearbit.com/apple.com',
+    MSFT:'https://logo.clearbit.com/microsoft.com',
+    GOOGL:'https://logo.clearbit.com/google.com',
+    META:'https://logo.clearbit.com/meta.com',
+    AMZN:'https://logo.clearbit.com/amazon.com',
+    NVDA:'https://logo.clearbit.com/nvidia.com',
+    TSLA:'https://logo.clearbit.com/tesla.com',
+    AMD:'https://logo.clearbit.com/amd.com',
+    NFLX:'https://logo.clearbit.com/netflix.com',
+    JPM:'https://logo.clearbit.com/jpmorganchase.com',
+    BAC:'https://logo.clearbit.com/bankofamerica.com',
+    V:'https://logo.clearbit.com/visa.com',
+    MA:'https://logo.clearbit.com/mastercard.com',
+    COIN:'https://logo.clearbit.com/coinbase.com',
+    SHOP:'https://logo.clearbit.com/shopify.com',
+    UBER:'https://logo.clearbit.com/uber.com',
+    ABNB:'https://logo.clearbit.com/airbnb.com',
+    PYPL:'https://logo.clearbit.com/paypal.com',
+    DIS:'https://logo.clearbit.com/thewaltdisneycompany.com',
+    WMT:'https://logo.clearbit.com/walmart.com',
+    XOM:'https://logo.clearbit.com/exxonmobil.com',
+    PLTR:'https://logo.clearbit.com/palantir.com',
+  };
+  return logos[sym]||null;
+}
 
 // ═══════════════════════════════════════════════════════════
 // FUNDAMENTALS
@@ -3445,7 +3656,8 @@ function fundGenData(sym){
   const r=(a,b,n=0)=>+(a+(b-a)*seed(sym,n)).toFixed(2);
   const baseRev=r(2,180,1)*1e9;const gRate=r(.04,.28,2);const gm=r(.25,.85,3);
   const baseEPS=r(.5,15,6);const shares=r(.5,20,7)*1e9;
-  const price=TICKER_PRICES[sym]||r(10,400,8);
+  // Use known price, or generate realistic price seeded by symbol
+  const price=TICKER_PRICES[sym]||(+(50+Math.abs(Math.sin(sym.charCodeAt(0)*17+sym.length*31))*420).toFixed(2));
   const years=[2025,2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2014];
   const qtrs=['Q4 25','Q3 25','Q2 25','Q1 25','Q4 24','Q3 24','Q2 24','Q1 24'];
 
@@ -3507,12 +3719,12 @@ function fundGenData(sym){
   const insts=['BlackRock Inc.','Vanguard Group','State Street Corp.','Fidelity Investments','T. Rowe Price','Geode Capital','Morgan Stanley','Goldman Sachs','JPMorgan Chase','Wellington Mgmt'];
   const similar=Object.keys(TICKER_PRICES).filter(s=>s!==sym).sort(()=>seed(sym,800+s.charCodeAt(0))-.5).slice(0,10);
   const descs={AAPL:'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. It also offers software, services, accessories, networking solutions, and third-party digital content. Apple was founded in 1976 and is headquartered in Cupertino, California.',TSLA:"Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems. It operates in two segments, Automotive, and Energy Generation and Storage. The company provides supercharger networks and self-driving capabilities.",NVDA:'NVIDIA Corporation provides graphics and compute solutions globally. Its products are used in gaming, professional visualization, datacenter, and automotive markets. It also designs system-on-chip units used in mobile computing and automotive markets.',MSFT:'Microsoft Corporation develops software, services, devices, and solutions worldwide. Its segments include Productivity and Business Processes, Intelligent Cloud, and More Personal Computing.',META:'Meta Platforms, Inc. develops products enabling people to connect and share through mobile devices, personal computers, and VR headsets. It operates in two segments: Family of Apps and Reality Labs.',DEFAULT:`${sym} operates as a publicly traded company providing products and services across its sector. The company has demonstrated consistent financial performance with strong fundamentals and growing market share.`};
-  const TICKER_NAMES2={AAPL:'Apple Inc.',TSLA:'Tesla, Inc.',NVDA:'NVIDIA Corporation',MSFT:'Microsoft Corporation',META:'Meta Platforms, Inc.',AMZN:'Amazon.com, Inc.',GOOGL:'Alphabet Inc.',AMD:'Advanced Micro Devices',SPY:'SPDR S&P 500 ETF',QQQ:'Invesco QQQ Trust',DEFAULT:`${sym} Corporation`};
-  const sectors2={AAPL:'Technology',TSLA:'Consumer Disc. / EV',NVDA:'Semiconductors',MSFT:'Technology',META:'Communication Services',AMZN:'Consumer Discretionary',GOOGL:'Communication Services',AMD:'Semiconductors',SPY:'ETF',QQQ:'ETF',DEFAULT:'Technology'};
+  const SECTOR_MAP={AAPL:'Technology',TSLA:'Consumer Disc. / EV',NVDA:'Semiconductors',MSFT:'Technology',META:'Communication Services',AMZN:'Consumer Discretionary',GOOGL:'Communication Services',AMD:'Semiconductors',SPY:'ETF',QQQ:'ETF',IWM:'ETF',GLD:'ETF',TLT:'ETF',INTC:'Semiconductors',MU:'Semiconductors',SMCI:'Semiconductors',SHOP:'Technology',UBER:'Technology',LYFT:'Technology',ABNB:'Consumer Discretionary',BABA:'Technology',PYPL:'Fintech',SQ:'Fintech',RIVN:'EV',NIO:'EV',MRNA:'Healthcare',LLY:'Healthcare',UNH:'Healthcare',BAC:'Finance',JPM:'Finance',CVX:'Energy',XOM:'Energy',MSTR:'Crypto',COIN:'Crypto',PLTR:'Technology',SOFI:'Fintech',HOOD:'Fintech',AMC:'Consumer',GME:'Consumer',NFLX:'Technology',DEFAULT:'Technology'};
+  const EXCHANGE_MAP={SPY:'NYSE ARCA',QQQ:'NASDAQ',IWM:'NYSE ARCA',GLD:'NYSE ARCA',TLT:'NYSE ARCA',SPX:'CBOE',DEFAULT:'NASDAQ'};
 
   return{
-    sym,name:TICKER_NAMES2[sym]||TICKER_NAMES2.DEFAULT,sector:sectors2[sym]||sectors2.DEFAULT,
-    exchange:['SPY','QQQ','IWM'].includes(sym)?'NYSE ARCA':'NASDAQ',
+    sym,name:TICKER_NAMES[sym]||`${sym} Corporation`,sector:SECTOR_MAP[sym]||SECTOR_MAP.DEFAULT,
+    exchange:EXCHANGE_MAP[sym]||EXCHANGE_MAP.DEFAULT,
     price,price52Low:+(price*.62).toFixed(2),price52High:+(price*1.48).toFixed(2),
     vol:Math.round((seed(sym,900)*50+5)*1e6),
     desc:descs[sym]||descs.DEFAULT,similar,
@@ -3537,12 +3749,14 @@ function fundFmt2(n){if(!n&&n!==0)return'—';const a=Math.abs(n);const s=n<0?'-
 // Search
 function fundShowDrop(){const d=document.getElementById('fundSearchDrop');if(d){d.classList.add('open');fundRDropItems(FUND_ASSETS_LIST().slice(0,8));}}
 function fundHideDrop(){const d=document.getElementById('fundSearchDrop');if(d)d.classList.remove('open');}
-function fundOnSearch(q){const d=document.getElementById('fundSearchDrop');if(!d)return;d.classList.add('open');if(!q.trim()){fundRDropItems(FUND_ASSETS_LIST().slice(0,8));return;}const ql=q.toUpperCase();fundRDropItems([...FUND_ASSETS_LIST().filter(a=>a.sym.startsWith(ql)),...FUND_ASSETS_LIST().filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||a.name.toUpperCase().includes(ql)))].slice(0,12));}
-function fundRDropItems(items){const d=document.getElementById('fundSearchDrop');if(!d)return;d.innerHTML=items.map(a=>`<div class="fund-sdi" onmousedown="document.getElementById('fundSearchIn').value='${a.sym}';fundAnalyze()"><span class="fund-sdi-sym">${a.sym}</span><span class="fund-sdi-name">${a.name}</span></div>`).join('');}
+function fundOnSearch(q){const d=document.getElementById('fundSearchDrop');if(!d)return;d.classList.add('open');const all=FUND_ASSETS_LIST();if(!q.trim()){fundRDropItems(all.slice(0,10));return;}const ql=q.toUpperCase();const ex=all.filter(a=>a.sym.startsWith(ql));const fz=all.filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||a.name.toUpperCase().includes(ql)));const custom=ql.length>=1&&![...ex,...fz].find(a=>a.sym===ql)?[{sym:ql,name:TICKER_NAMES[ql]||`${ql} — presiona Analizar`}]:[];fundRDropItems([...custom,...ex,...fz].slice(0,12));}
+function fundRDropItems(items){const d=document.getElementById('fundSearchDrop');if(!d)return;if(!items.length){d.innerHTML='<div style="padding:8px 14px;font-size:9px;color:#334155">Sin resultados — presiona Analizar para cualquier ticker</div>';return;}d.innerHTML=items.map(a=>`<div class="fund-sdi" onmousedown="document.getElementById('fundSearchIn').value='${a.sym}';fundAnalyze()"><span class="fund-sdi-sym">${a.sym}</span><span class="fund-sdi-name">${a.name}</span></div>`).join('');}
 
 function fundAnalyze(){
-  const sym=(document.getElementById('fundSearchIn')?.value||'').trim().toUpperCase();
-  if(!sym)return;FUND.sym=sym;fundHideDrop();
+  let sym=(document.getElementById('fundSearchIn')?.value||'').trim().toUpperCase();
+  if(!sym)return;
+  // Accept any symbol, not just preset ones
+  FUND.sym=sym;fundHideDrop();
   ['fundCoHdr','fundDescWrap','fundSimilar','fundMetricsGrid','fundTabs','fundPeriodBar','fundChartsRow','fundBigCharts','fundTableWrap','fundRatiosGrid','fundDivSection','fundHoldersWrap','fundCompWrap'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.classList.remove('show');}});
   document.getElementById('fundEmpty').style.display='none';
   document.getElementById('fundLoading')?.classList.add('show');
@@ -3837,15 +4051,18 @@ document.addEventListener('click',e=>{if(!e.target.closest('#sgb'))sgbCloseAllDr
 // Strategy select
 function sgbSelStrat(key,label,dir,type){SGB.strat=key;SGB.stratLabel=label;SGB.dir=dir;const lbl=document.getElementById('sgbStratLabel');if(lbl)lbl.textContent=label;sgbBuildLegs(key);sgbCloseAllDrops();sgbRenderAll();}
 
-// Symbol search
-function sgbShowDrop(){const d=document.getElementById('sgbSearchDrop');if(d){d.classList.add('open');sgbRenderSearchItems(SGB.allAssets.slice(0,10));}}
+// Symbol search — uses full TICKER_PRICES list + accepts any custom ticker
+function sgbGetAllTickers(){return Object.keys(TICKER_PRICES).map(s=>({sym:s,name:TICKER_NAMES[s]||s}));}
+function sgbShowDrop(){const d=document.getElementById('sgbSearchDrop');if(d){d.classList.add('open');sgbRenderSearchItems(sgbGetAllTickers().slice(0,12));}}
 function sgbHideDrop(){const d=document.getElementById('sgbSearchDrop');if(d)d.classList.remove('open');}
-function sgbOnSearch(q){const d=document.getElementById('sgbSearchDrop');if(!d)return;d.classList.add('open');if(!SGB.assetsLoaded||!q.trim()){sgbRenderSearchItems(SGB.allAssets.slice(0,10));return;}const ql=q.toUpperCase();const ex=SGB.allAssets.filter(a=>a.sym.startsWith(ql));const fz=SGB.allAssets.filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||a.name?.toUpperCase().includes(ql)));sgbRenderSearchItems([...ex,...fz].slice(0,14));}
+function sgbOnSearch(q){const d=document.getElementById('sgbSearchDrop');if(!d)return;d.classList.add('open');const all=sgbGetAllTickers();if(!q.trim()){sgbRenderSearchItems(all.slice(0,12));return;}const ql=q.toUpperCase();const ex=all.filter(a=>a.sym.startsWith(ql));const fz=all.filter(a=>!a.sym.startsWith(ql)&&(a.sym.includes(ql)||(a.name||'').toUpperCase().includes(ql)));// Add typed sym if not found
+const custom=ql.length>=1&&![...ex,...fz].find(a=>a.sym===ql)?[{sym:ql,name:TICKER_NAMES[ql]||`${ql} — ingresa para analizar`}]:[];sgbRenderSearchItems([...custom,...ex,...fz].slice(0,14));}
 function sgbRenderSearchItems(items){const d=document.getElementById('sgbSearchDrop');if(!d)return;if(!items.length){d.innerHTML='<div style="padding:10px;font-size:9px;color:#334155;font-family:JetBrains Mono,monospace">Sin resultados</div>';return;}d.innerHTML=items.map(a=>`<div class="sgb-sdi" onmousedown="sgbSelectSym('${a.sym}','${(a.name||'').replace(/'/g,"\\'")}')"><span class="sgb-sds">${a.sym}</span><span class="sgb-sdn">${a.name||''}</span></div>`).join('');}
 function sgbSelectSym(sym,name){
-  SGB.sym=sym;SGB.name=name||TICKER_NAMES[sym]||sym;
-  SGB.spot=TICKER_PRICES[sym]||+(Math.random()*300+20).toFixed(2);
-  SGB.iv=Math.round(20+Math.random()*60);
+  SGB.sym=sym.toUpperCase();SGB.name=name||TICKER_NAMES[sym]||sym;
+  // Use known price or generate a realistic one based on ticker
+  SGB.spot=TICKER_PRICES[sym]||+(50+Math.abs(Math.sin(sym.charCodeAt(0)*17))*450).toFixed(2);
+  SGB.iv=Math.round(15+Math.abs(Math.sin(sym.charCodeAt(0)*13))*80);
   const inp=document.getElementById('sgbSearchIn');if(inp)inp.value='';
   sgbHideDrop();sgbUpdateTickerUI();sgbBuildLegs(SGB.strat);SGB.rulerOffset=0;
   const ivsl=document.getElementById('sgbIvSlider');if(ivsl)ivsl.value=SGB.iv;
@@ -4080,7 +4297,8 @@ function sgbSetExp(btn,exp,dte){document.querySelectorAll('.sgb-exp-btn').forEac
 function sgbRenderAll(){sgbUpdateLegSum();sgbCalcMetrics();sgbDrawRuler();sgbBuildChart();}
 
 // Assets for search (reuse main APP assets)
-function sgbLoadAssets(){if(APP&&APP.allAssets&&APP.allAssets.length){SGB.allAssets=APP.allAssets;SGB.assetsLoaded=true;}else{SGB.allAssets=Object.entries(TICKER_PRICES).map(([sym])=>({sym,name:TICKER_NAMES[sym]||sym}));SGB.assetsLoaded=true;}}
+function sgbLoadAssets(){SGB.allAssets=sgbGetAllTickers();SGB.assetsLoaded=true;if(APP&&APP.allAssets&&APP.allAssets.length){// Merge with Alpaca-fetched assets
+const appSyms=new Set(SGB.allAssets.map(a=>a.sym));APP.allAssets.forEach(a=>{if(!appSyms.has(a.sym))SGB.allAssets.push({sym:a.sym,name:a.name||a.sym});});}}
 
 // Override switchMain to init sigma builder
 const _origSwitchMain2=window.switchMain;
