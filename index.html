@@ -2323,31 +2323,226 @@ input[type=range].sgb-sl{width:100%;accent-color:#3b82f6;height:3px}
 // These are filled via the API Config modal in the topbar
 const API_CONFIG={
   tradier:{key:'',endpoint:'https://sandbox.tradier.com/v1',sandbox:true},
-  alpaca:{key:'',secret:'',endpoint:'https://data.alpaca.markets/v2',paper:true}
+  alpaca:{key:'',secret:'',endpoint:'https://data.alpaca.markets',paper:true}
 };
-// Fetch real quote from Alpaca (fill API keys first)
-async function apiGetQuote(sym){
+
+// ── ALPACA LIVE QUOTE ─────────────────────────────────────────
+async function apiLiveQuote(sym){
   if(!API_CONFIG.alpaca.key)return null;
   try{
-    const r=await fetch(`${API_CONFIG.alpaca.endpoint}/stocks/${sym}/quotes/latest`,{headers:{'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret}});
-    const d=await r.json();return d?.quote||null;
-  }catch{return null;}
+    const base=API_CONFIG.alpaca.paper?'https://data.alpaca.markets':'https://data.alpaca.markets';
+    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
+    const r=await fetch(base+'/v2/stocks/'+sym+'/quotes/latest',{headers});
+    if(!r.ok)return null;
+    const d=await r.json();
+    const q=d.quote||d;
+    const price=(q.ap+q.bp)/2||q.ap||q.bp||0;
+    return price?{price,bid:q.bp,ask:q.ap,size:q.as,chg:0,chgPct:0}:null;
+  }catch(e){console.warn('Alpaca quote error:',e);return null;}
 }
-// Fetch option chain from Tradier
+
+// ── ALPACA LATEST TRADE (more reliable than quote) ────────────
+async function apiLatestTrade(sym){
+  if(!API_CONFIG.alpaca.key)return null;
+  try{
+    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
+    const r=await fetch('https://data.alpaca.markets/v2/stocks/'+sym+'/trades/latest',{headers});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d.trade?{price:d.trade.p,size:d.trade.s,ts:d.trade.t}:null;
+  }catch(e){return null;}
+}
+
+// ── ALPACA BARS (historical + daily change) ───────────────────
+async function apiGetBars(sym,timeframe,limit){
+  if(!API_CONFIG.alpaca.key)return null;
+  try{
+    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
+    const end=new Date().toISOString();
+    const start=new Date(Date.now()-limit*24*60*60*1000).toISOString();
+    const url='https://data.alpaca.markets/v2/stocks/'+sym+'/bars?timeframe='+timeframe+'&start='+start+'&end='+end+'&limit='+limit+'&feed=iex';
+    const r=await fetch(url,{headers});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d.bars||null;
+  }catch(e){return null;}
+}
+
+// ── ALPACA MULTI-SNAPSHOT (price, change, IV proxy) ──────────
+async function apiGetSnapshot(sym){
+  if(!API_CONFIG.alpaca.key)return null;
+  try{
+    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
+    const r=await fetch('https://data.alpaca.markets/v2/stocks/'+sym+'/snapshot',{headers});
+    if(!r.ok)return null;
+    const d=await r.json();
+    if(!d.latestTrade&&!d.latestQuote)return null;
+    const price=d.latestTrade?.p||(d.latestQuote?((d.latestQuote.ap+d.latestQuote.bp)/2):0);
+    const open=d.dailyBar?.o||price;
+    const chg=price-open;
+    const chgPct=open?chg/open*100:0;
+    const high=d.dailyBar?.h||price;
+    const low=d.dailyBar?.l||price;
+    const vol=d.dailyBar?.v||0;
+    // Calculate HV proxy from min/max range
+    const hvProxy=open?((high-low)/open*100)*Math.sqrt(252):20;
+    return{price,open,high,low,chg,chgPct,vol,hvProxy:+hvProxy.toFixed(1),
+      bid:d.latestQuote?.bp||0,ask:d.latestQuote?.ap||0,
+      prevClose:d.prevDailyBar?.c||price};
+  }catch(e){console.warn('Alpaca snapshot error:',e);return null;}
+}
+
+// ── TRADIER OPTION CHAIN ──────────────────────────────────────
 async function apiGetOptionChain(sym,exp){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/options/chains?symbol=${sym}&expiration=${exp}&greeks=true`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
-    const d=await r.json();return d?.options?.option||null;
-  }catch{return null;}
+    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
+    const r=await fetch(endpoint+'/markets/options/chains?symbol='+sym+'&expiration='+exp+'&greeks=true',
+      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d?.options?.option||null;
+  }catch(e){console.warn('Tradier chain error:',e);return null;}
 }
-// Fetch IV from Tradier
-async function apiGetIV(sym){
+
+// ── TRADIER OPTION EXPIRATIONS ────────────────────────────────
+async function apiGetExpirations(sym){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const r=await fetch(`${API_CONFIG.tradier.endpoint}/markets/history?symbol=${sym}&interval=daily&start=${new Date(Date.now()-90*86400000).toISOString().slice(0,10)}`,{headers:{Authorization:`Bearer ${API_CONFIG.tradier.key}`,Accept:'application/json'}});
-    const d=await r.json();return d?.history?.day||null;
-  }catch{return null;}
+    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
+    const r=await fetch(endpoint+'/markets/options/expirations?symbol='+sym+'&includeAllRoots=true',
+      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d?.expirations?.date||null;
+  }catch(e){return null;}
+}
+
+// ── TRADIER QUOTE ─────────────────────────────────────────────
+async function apiTradierQuote(sym){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
+    const r=await fetch(endpoint+'/markets/quotes?symbols='+sym,
+      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    if(!r.ok)return null;
+    const d=await r.json();
+    const q=d?.quotes?.quote;
+    if(!q)return null;
+    return{price:q.last||q.close,open:q.open,high:q.high,low:q.low,
+      chg:q.change,chgPct:q.change_percentage,vol:q.volume,
+      bid:q.bid,ask:q.ask,prevClose:q.prevclose,
+      week52High:q.week_52_high,week52Low:q.week_52_low};
+  }catch(e){return null;}
+}
+
+// ── TRADIER HISTORICAL (for HV calculation) ───────────────────
+async function apiGetHistory(sym,days){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
+    const start=new Date(Date.now()-days*24*60*60*1000).toISOString().slice(0,10);
+    const r=await fetch(endpoint+'/markets/history?symbol='+sym+'&interval=daily&start='+start,
+      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d?.history?.day||null;
+  }catch(e){return null;}
+}
+
+// ── TRADIER IV (from option chain ATM strike) ─────────────────
+async function apiLiveIV(sym){
+  if(!API_CONFIG.tradier.key)return null;
+  try{
+    const exps=await apiGetExpirations(sym);
+    if(!exps||!exps.length)return null;
+    const exp=exps[0];// nearest expiration
+    const chain=await apiGetOptionChain(sym,exp);
+    if(!chain||!chain.length)return null;
+    // Find ATM call
+    const price=APP.price;
+    const atm=chain.filter(o=>o.option_type==='call').sort((a,b)=>Math.abs(a.strike-price)-Math.abs(b.strike-price))[0];
+    return atm?.greeks?.mid_iv?+(atm.greeks.mid_iv*100).toFixed(1):null;
+  }catch(e){return null;}
+}
+
+// ── HV CALCULATION from price history ────────────────────────
+function calcHV(bars,period){
+  if(!bars||bars.length<period+1)return null;
+  const recent=bars.slice(-period-1);
+  const returns=[];
+  for(let i=1;i<recent.length;i++){
+    const prev=recent[i-1].c||recent[i-1].close||recent[i-1].vw;
+    const curr=recent[i].c||recent[i].close||recent[i].vw;
+    if(prev&&curr)returns.push(Math.log(curr/prev));
+  }
+  if(returns.length<2)return null;
+  const mean=returns.reduce((a,b)=>a+b,0)/returns.length;
+  const variance=returns.reduce((a,b)=>a+(b-mean)**2,0)/(returns.length-1);
+  return +(Math.sqrt(variance*252)*100).toFixed(1);
+}
+
+// ── MASTER REFRESH: fetch everything for current symbol ───────
+async function apiFetchAll(sym){
+  sym=sym||APP.sym;
+  const results={};
+  // Try Tradier first (more option data), fallback to Alpaca
+  const [tradierQ,alpacaSnap]=await Promise.all([
+    apiTradierQuote(sym),
+    apiGetSnapshot(sym)
+  ]);
+  const q=tradierQ||alpacaSnap;
+  if(q){
+    APP.price=q.price||APP.price;
+    APP.priceChg=q.chg||0;
+    APP.priceChgPct=q.chgPct||0;
+    APP.priceBid=q.bid;
+    APP.priceAsk=q.ask;
+    APP.priceHigh=q.high;
+    APP.priceLow=q.low;
+    APP.priceVol=q.vol;
+    APP.price52High=q.week52High||q.high;
+    APP.price52Low=q.week52Low||q.low;
+    results.quote=q;
+  }
+  // Historical for HV
+  const [tradierHist,alpacaBars]=await Promise.all([
+    apiGetHistory(sym,30),
+    apiGetBars(sym,'1Day',30)
+  ]);
+  const bars=tradierHist||alpacaBars;
+  if(bars){
+    APP.hv20=calcHV(bars,20)||APP.hv20||25;
+    results.bars=bars;
+  }
+  // IV from Tradier option chain
+  const iv=await apiLiveIV(sym);
+  if(iv){APP.iv=iv;results.iv=iv;}
+  updateSymUI();
+  return results;
+}
+
+// ── AUTO-REFRESH LIVE PRICES every 30s ───────────────────────
+let _autoRefreshTimer=null;
+function startLiveRefresh(){
+  if(_autoRefreshTimer)clearInterval(_autoRefreshTimer);
+  if(!API_CONFIG.alpaca.key&&!API_CONFIG.tradier.key)return;
+  _autoRefreshTimer=setInterval(function(){
+    apiLiveQuote(APP.sym).then(function(q){
+      if(q){APP.price=q.price;updateSymUI();}
+    });
+    // Also try Tradier
+    apiTradierQuote(APP.sym).then(function(q){
+      if(q&&q.price){APP.price=q.price;APP.priceChg=q.chg;APP.priceChgPct=q.chgPct;updateSymUI();}
+    });
+  },30000);
+  console.log('Live refresh started (30s interval)');
+}
+
+// ── LIVE QUOTE ────────────────────────────────────────────────
+async function apiGetQuote(sym){
+  const q=await apiTradierQuote(sym)||await apiGetSnapshot(sym);
+  return q;
 }
 
 // ── EXPANDED TICKER DATABASE (100+ symbols) ────────────────────
@@ -2589,20 +2784,39 @@ function renderDrop(items){
 function showDrop(){document.getElementById('searchDrop').classList.add('open');if(APP.assetsLoaded)renderDrop(APP.allAssets.slice(0,12));}
 function hideDrop(){document.getElementById('searchDrop').classList.remove('open');}
 function selectAsset(sym,name){
-  const prices={SPY:742.31,SPX:5842,QQQ:500,AAPL:212,NVDA:138,TSLA:245,MSFT:430,AMZN:192,GOOGL:178,META:558,AMD:163,NFLX:1020,PLTR:28,COIN:245,GME:22,DIS:98,BAC:44,JPM:248,GS:580,XOM:115,SNAP:9.5,UBER:82,BABA:105,MSTR:380,IWM:210,GLD:230,TLT:87,WMT:95,RIVN:12};
-  APP.sym=sym;APP.name=name;APP.price=prices[sym]||+(Math.random()*150+20).toFixed(2);
+  APP.sym=sym;APP.name=name;
+  APP.price=TICKER_PRICES[sym]||+(Math.random()*150+20).toFixed(2);
   document.getElementById('searchInput').value='';hideDrop();
   updateSymUI();generateExpirations();APP.selectedExp='all';document.getElementById('expSelect').value='all';
   doRefresh();
+  // Fetch real price from Alpaca if key is set
+  apiLiveQuote(sym).then(q=>{
+    if(q){
+      APP.price=q.price;APP.priceChg=q.chg;APP.priceChgPct=q.chgPct;
+      updateSymUI();
+    }
+  });
+  // Fetch real IV from Tradier if key is set
+  apiLiveIV(sym).then(iv=>{if(iv){APP.iv=iv;updateSymUI();}});
 }
 function updateSymUI(){
-  const chg=+((Math.random()-.4)*2).toFixed(2);
+  const chg=APP.priceChg||+((Math.random()-.4)*2).toFixed(2);
+  const pct=APP.priceChgPct||chg;
   document.getElementById('curSym').textContent=APP.sym;
-  document.getElementById('curPrice').textContent=`$${APP.price.toFixed(2)}`;
+  document.getElementById('curPrice').textContent='$'+APP.price.toFixed(2);
   document.getElementById('curName').textContent=APP.name;
-  const ce=document.getElementById('curChg');ce.textContent=`${chg>=0?'+':''}${chg}%`;ce.className=`cchg ${chg>=0?'up':'dn'}`;
-  ['flow-sym','flow-sym2','vol-sym','hm-sym','im-sym','gk-sym'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=APP.sym;});
-  document.getElementById('gk-price').textContent=`$${APP.price.toFixed(2)}`;
+  const ce=document.getElementById('curChg');
+  ce.textContent=(chg>=0?'+':'')+pct.toFixed(2)+'%';
+  ce.className='cchg '+(chg>=0?'up':'dn');
+  ['flow-sym','flow-sym2','vol-sym','hm-sym','im-sym','gk-sym'].forEach(function(id){const e=document.getElementById(id);if(e)e.textContent=APP.sym;});
+  const gkp=document.getElementById('gk-price');if(gkp)gkp.textContent='$'+APP.price.toFixed(2);
+  // Update live badge
+  const liveBadge=document.getElementById('liveStatus');
+  if(liveBadge){
+    const hasKeys=!!(API_CONFIG.alpaca.key||API_CONFIG.tradier.key);
+    liveBadge.textContent=hasKeys?'● LIVE':'● DEMO';
+    liveBadge.style.color=hasKeys?'#22c55e':'#f59e0b';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3050,7 +3264,20 @@ function renderPred(){
 // ═══════════════════════════════════════════════════════════
 function openModal(){document.getElementById('modalOverlay').classList.add('open');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
-function saveTradier(){APP.tradierToken=document.getElementById('tradierKey').value;API_CONFIG.tradier.key=APP.tradierToken;document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>Token guardado — Fundamentals y Options Chain listos';document.getElementById('tradierBadge').className='abadge ok';document.getElementById('tradierBadge').textContent='TRADIER ●';}
+function saveTradier(){
+  const key=document.getElementById('tradierKey').value.trim();
+  APP.tradierToken=key;
+  API_CONFIG.tradier.key=key;
+  API_CONFIG.tradier.sandbox=document.getElementById('tradierEnv')?.value==='sandbox';
+  localStorage.setItem('tradier_key',key);
+  localStorage.setItem('tradier_env',API_CONFIG.tradier.sandbox?'sandbox':'live');
+  document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>Token guardado';
+  document.getElementById('tradierBadge').className='abadge ok';
+  document.getElementById('tradierBadge').textContent='TRADIER ●';
+  // Test immediately
+  testTradier();
+  startLiveRefresh();
+}
 function testTradier(){
   const st=document.getElementById('tradierStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
   const base=document.getElementById('tradierEnv').value==='live'?'https://api.tradier.com':'https://sandbox.tradier.com';
@@ -3058,7 +3285,25 @@ function testTradier(){
     .then(r=>r.json()).then(d=>{if(d.profile){st.innerHTML=`<span class="cfg-dot live"></span>Conectado: ${d.profile.name}`;document.getElementById('tradierBadge').className='abadge ok';}else st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Token inválido';})
     .catch(()=>st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error CORS — requiere proxy backend');
 }
-function saveAlpaca(){APP.alpacaKey=document.getElementById('alpacaKey').value;APP.alpacaSecret=document.getElementById('alpacaSecret').value;APP.alpacaEnv=document.getElementById('alpacaEnv').value;API_CONFIG.alpaca.key=APP.alpacaKey;API_CONFIG.alpaca.secret=APP.alpacaSecret;API_CONFIG.alpaca.paper=APP.alpacaEnv==='paper';document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>Guardado — recargando activos...';document.getElementById('alpacaBadge').className='abadge ok';document.getElementById('alpacaBadge').textContent='ALPACA ●';loadAssets();}
+function saveAlpaca(){
+  const key=document.getElementById('alpacaKey').value.trim();
+  const secret=document.getElementById('alpacaSecret').value.trim();
+  const env=document.getElementById('alpacaEnv').value;
+  APP.alpacaKey=key;APP.alpacaSecret=secret;APP.alpacaEnv=env;
+  API_CONFIG.alpaca.key=key;API_CONFIG.alpaca.secret=secret;API_CONFIG.alpaca.paper=(env==='paper');
+  localStorage.setItem('alpaca_key',key);
+  localStorage.setItem('alpaca_secret',secret);
+  localStorage.setItem('alpaca_env',env);
+  document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>Guardado — conectando...';
+  document.getElementById('alpacaBadge').className='abadge ok';
+  document.getElementById('alpacaBadge').textContent='ALPACA ●';
+  loadAssets();
+  startLiveRefresh();
+  // Fetch live price for current symbol
+  apiFetchAll(APP.sym).then(function(){
+    document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>Conectado — datos en vivo activos';
+  });
+}
 function testAlpaca(){
   const st=document.getElementById('alpacaStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
   const base=document.getElementById('alpacaEnv').value==='paper'?'https://paper-api.alpaca.markets':'https://api.alpaca.markets';
@@ -3786,14 +4031,44 @@ function fundOnSearch(q){const d=document.getElementById('fundSearchDrop');if(!d
 function fundRDropItems(items){const d=document.getElementById('fundSearchDrop');if(!d)return;if(!items.length){d.innerHTML='<div style="padding:8px 14px;font-size:9px;color:#334155">Sin resultados — presiona Analizar para cualquier ticker</div>';return;}d.innerHTML=items.map(a=>`<div class="fund-sdi" onmousedown="document.getElementById('fundSearchIn').value='${a.sym}';fundAnalyze()"><span class="fund-sdi-sym">${a.sym}</span><span class="fund-sdi-name">${a.name}</span></div>`).join('');}
 
 function fundAnalyze(){
-  let sym=(document.getElementById('fundSearchIn')?.value||'').trim().toUpperCase();
+  var sym=(document.getElementById('fundSearchIn')?.value||'').trim().toUpperCase();
   if(!sym)return;
-  // Accept any symbol, not just preset ones
   FUND.sym=sym;fundHideDrop();
-  ['fundCoHdr','fundDescWrap','fundSimilar','fundMetricsGrid','fundTabs','fundPeriodBar','fundChartsRow','fundBigCharts','fundTableWrap','fundRatiosGrid','fundDivSection','fundHoldersWrap','fundCompWrap'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.classList.remove('show');}});
+  ['fundCoHdr','fundDescWrap','fundSimilar','fundMetricsGrid','fundTabs','fundPeriodBar','fundChartsRow','fundBigCharts','fundTableWrap','fundRatiosGrid','fundDivSection','fundHoldersWrap','fundCompWrap'].forEach(function(id){var e=document.getElementById(id);if(e){e.style.display='none';e.classList.remove('show');}});
   document.getElementById('fundEmpty').style.display='none';
-  document.getElementById('fundLoading')?.classList.add('show');
-  setTimeout(()=>{FUND.data=fundGenData(sym);document.getElementById('fundLoading')?.classList.remove('show');fundRender();},800);
+  var loader=document.getElementById('fundLoading');if(loader)loader.classList.add('show');
+  // Try live API data, overlay onto synthetic base
+  Promise.all([
+    apiGetSnapshot(sym),
+    apiTradierQuote(sym),
+    apiGetHistory(sym,365),
+    apiGetBars(sym,'1Day',365)
+  ]).then(function(res){
+    var snap=res[0],tq=res[1],tradierHist=res[2],alpacaBars=res[3];
+    var q=tq||snap;
+    var bars=tradierHist||alpacaBars;
+    var d=fundGenData(sym);
+    if(q&&q.price){
+      d.price=q.price;
+      if(q.week52High)d.price52High=q.week52High;
+      if(q.week52Low)d.price52Low=q.week52Low;
+      if(q.vol)d.vol=q.vol;
+      if(q.chg!==undefined){d.priceChg=q.chg;d.priceChgPct=q.chgPct;}
+    }
+    if(bars&&bars.length>5){
+      var hv20r=calcHV(bars,Math.min(20,bars.length-1));
+      if(hv20r)d.hv20=hv20r;
+      d.priceHistory=bars.slice(-30).map(function(b){return b.c||b.close||b.vw||d.price;});
+    }
+    d.isLive=!!(q||bars);
+    FUND.data=d;
+    if(loader)loader.classList.remove('show');
+    fundRender();
+  }).catch(function(){
+    FUND.data=fundGenData(sym);
+    if(loader)loader.classList.remove('show');
+    fundRender();
+  });
 }
 
 function fundRender(){
@@ -4016,6 +4291,36 @@ function jrnImport(){const input=document.createElement('input');input.type='fil
 
 const _origSM5=window.switchMain;
 window.switchMain=function(id,el){_origSM5(id,el);if(id==='journal'){setTimeout(()=>{jrnFilter();jrnUpdateStats();jrnRenderChart();},60);}};
+
+// ── RESTORE SAVED API KEYS from localStorage ──────────────────
+(function restoreApiKeys(){
+  const tk=localStorage.getItem('tradier_key');
+  const te=localStorage.getItem('tradier_env')||'sandbox';
+  if(tk){
+    APP.tradierToken=tk;API_CONFIG.tradier.key=tk;API_CONFIG.tradier.sandbox=(te==='sandbox');
+    const inp=document.getElementById('tradierKey');if(inp)inp.value=tk;
+    document.getElementById('tradierBadge').className='abadge ok';
+    document.getElementById('tradierBadge').textContent='TRADIER ●';
+    document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>API Key restaurada';
+  }
+  const ak=localStorage.getItem('alpaca_key');
+  const as=localStorage.getItem('alpaca_secret');
+  const ae=localStorage.getItem('alpaca_env')||'paper';
+  if(ak){
+    APP.alpacaKey=ak;APP.alpacaSecret=as||'';APP.alpacaEnv=ae;
+    API_CONFIG.alpaca.key=ak;API_CONFIG.alpaca.secret=as||'';API_CONFIG.alpaca.paper=(ae==='paper');
+    const ki=document.getElementById('alpacaKey');if(ki)ki.value=ak;
+    const si=document.getElementById('alpacaSecret');if(si)si.value=as||'';
+    document.getElementById('alpacaBadge').className='abadge ok';
+    document.getElementById('alpacaBadge').textContent='ALPACA ●';
+    document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>API Key restaurada';
+  }
+  if(tk||ak){
+    setTimeout(function(){
+      apiFetchAll(APP.sym).then(function(){startLiveRefresh();});
+    },500);
+  }
+})();
 
 generateExpirations();
 generateImData();
