@@ -812,8 +812,18 @@ input[type=range].sb-sl{width:100%;accent-color:#3b82f6;height:3px}
       <div class="cfg-title">Tradier API</div>
       <div class="cfg-row"><span class="cfg-label">Access Token</span><input class="cfg-input" type="password" id="tradierKey" placeholder="tu-token-aquí..."></div>
       <div class="cfg-row"><span class="cfg-label">Entorno</span><select class="cfg-select" id="tradierEnv"><option value="live">Production (live)</option><option value="sandbox">Sandbox</option></select></div>
+      <div class="cfg-row"><span class="cfg-label">Proxy URL <span style="font-size:9px;color:#64748b">(opcional)</span></span><input class="cfg-input" id="tradierProxyUrl" placeholder="https://tu-proxy.workers.dev/tradier" title="Requerido para datos en vivo desde el browser"></div>
       <div class="cfg-btns"><button class="cfg-btn" onclick="saveTradier()">Guardar</button><button class="cfg-btn" onclick="testTradier()">Probar conexión</button></div>
       <div class="cfg-status" id="tradierStatus"><span class="cfg-dot"></span>No configurado</div>
+      <div id="tradierCorsNote" style="display:none;margin-top:8px;background:#1a1500;border:1px solid #f59e0b44;border-radius:6px;padding:10px;font-size:10px;color:#f59e0b;line-height:1.7">
+        ⚠️ <b>Tradier bloquea requests directos del browser (CORS).</b><br>
+        Tu token está guardado. Para datos en vivo necesitas un proxy:<br>
+        <span style="color:#94a3b8">1. Ve a <a href="https://workers.cloudflare.com" target="_blank" style="color:#3b82f6">workers.cloudflare.com</a> (gratis)<br>
+        2. Crea un Worker con el código del botón de abajo<br>
+        3. Pega la URL del worker en "Proxy URL" arriba</span><br>
+        <button onclick="tradierShowWorkerCode()" style="margin-top:6px;background:#1e3050;border:1px solid #3b82f6;border-radius:4px;color:#3b82f6;font-size:9px;padding:3px 10px;cursor:pointer">📋 Ver código del Worker</button>
+        <span style="color:#64748b;font-size:9px;margin-left:6px">— o usa Alpaca para datos de precios (funciona directo)</span>
+      </div>
     </div>
     <div class="cfg-section">
       <div class="cfg-title">Alpaca API</div>
@@ -2330,23 +2340,20 @@ const API_CONFIG={
 async function apiLiveQuote(sym){
   if(!API_CONFIG.alpaca.key)return null;
   try{
-    const base=API_CONFIG.alpaca.paper?'https://data.alpaca.markets':'https://data.alpaca.markets';
-    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
-    const r=await fetch(base+'/v2/stocks/'+sym+'/quotes/latest',{headers});
+    const r=await fetch(ALPACA_DATA+'/v2/stocks/'+sym+'/quotes/latest',{headers:alpacaHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     const q=d.quote||d;
-    const price=(q.ap+q.bp)/2||q.ap||q.bp||0;
-    return price?{price,bid:q.bp,ask:q.ap,size:q.as,chg:0,chgPct:0}:null;
-  }catch(e){console.warn('Alpaca quote error:',e);return null;}
+    const price=q.ap&&q.bp?(q.ap+q.bp)/2:(q.ap||q.bp||0);
+    return price?{price:+price.toFixed(2),bid:q.bp||0,ask:q.ap||0,chg:0,chgPct:0}:null;
+  }catch(e){console.warn('Alpaca quote error:',e.message);return null;}
 }
 
 // ── ALPACA LATEST TRADE (more reliable than quote) ────────────
 async function apiLatestTrade(sym){
   if(!API_CONFIG.alpaca.key)return null;
   try{
-    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
-    const r=await fetch('https://data.alpaca.markets/v2/stocks/'+sym+'/trades/latest',{headers});
+    const r=await fetch(ALPACA_DATA+'/v2/stocks/'+sym+'/trades/latest',{headers:alpacaHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     return d.trade?{price:d.trade.p,size:d.trade.s,ts:d.trade.t}:null;
@@ -2357,93 +2364,114 @@ async function apiLatestTrade(sym){
 async function apiGetBars(sym,timeframe,limit){
   if(!API_CONFIG.alpaca.key)return null;
   try{
-    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
     const end=new Date().toISOString();
     const start=new Date(Date.now()-limit*24*60*60*1000).toISOString();
-    const url='https://data.alpaca.markets/v2/stocks/'+sym+'/bars?timeframe='+timeframe+'&start='+start+'&end='+end+'&limit='+limit+'&feed=iex';
-    const r=await fetch(url,{headers});
-    if(!r.ok)return null;
+    const url=ALPACA_DATA+'/v2/stocks/'+sym+'/bars?timeframe='+timeframe+'&start='+start+'&end='+end+'&limit='+limit+'&feed=iex';
+    const r=await fetch(url,{headers:alpacaHeaders()});
+    if(!r.ok){
+      // Try without feed param
+      const url2=ALPACA_DATA+'/v2/stocks/'+sym+'/bars?timeframe='+timeframe+'&start='+start+'&end='+end+'&limit='+limit;
+      const r2=await fetch(url2,{headers:alpacaHeaders()});
+      if(!r2.ok)return null;
+      const d2=await r2.json();
+      return d2.bars||null;
+    }
     const d=await r.json();
     return d.bars||null;
   }catch(e){return null;}
 }
 
+// ── ALPACA HEADERS ───────────────────────────────────────────
+function alpacaHeaders(){
+  return{'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
+}
+// Alpaca data endpoint is ALWAYS data.alpaca.markets regardless of paper/live
+const ALPACA_DATA='https://data.alpaca.markets';
+
 // ── ALPACA MULTI-SNAPSHOT (price, change, IV proxy) ──────────
 async function apiGetSnapshot(sym){
   if(!API_CONFIG.alpaca.key)return null;
   try{
-    const headers={'APCA-API-KEY-ID':API_CONFIG.alpaca.key,'APCA-API-SECRET-KEY':API_CONFIG.alpaca.secret};
-    const r=await fetch('https://data.alpaca.markets/v2/stocks/'+sym+'/snapshot',{headers});
-    if(!r.ok)return null;
+    const r=await fetch(ALPACA_DATA+'/v2/stocks/'+sym+'/snapshot?feed=iex',{headers:alpacaHeaders()});
+    if(!r.ok){
+      // Try without feed param
+      const r2=await fetch(ALPACA_DATA+'/v2/stocks/'+sym+'/snapshot',{headers:alpacaHeaders()});
+      if(!r2.ok)return null;
+      var d2=await r2.json();
+      return parseAlpacaSnap(d2,sym);
+    }
     const d=await r.json();
-    if(!d.latestTrade&&!d.latestQuote)return null;
-    const price=d.latestTrade?.p||(d.latestQuote?((d.latestQuote.ap+d.latestQuote.bp)/2):0);
-    const open=d.dailyBar?.o||price;
-    const chg=price-open;
-    const chgPct=open?chg/open*100:0;
-    const high=d.dailyBar?.h||price;
-    const low=d.dailyBar?.l||price;
-    const vol=d.dailyBar?.v||0;
-    // Calculate HV proxy from min/max range
-    const hvProxy=open?((high-low)/open*100)*Math.sqrt(252):20;
-    return{price,open,high,low,chg,chgPct,vol,hvProxy:+hvProxy.toFixed(1),
-      bid:d.latestQuote?.bp||0,ask:d.latestQuote?.ap||0,
-      prevClose:d.prevDailyBar?.c||price};
-  }catch(e){console.warn('Alpaca snapshot error:',e);return null;}
+    return parseAlpacaSnap(d,sym);
+  }catch(e){console.warn('Alpaca snapshot error:',e.message);return null;}
+}
+function parseAlpacaSnap(d,sym){
+  if(!d)return null;
+  const price=d.latestTrade?.p||(d.latestQuote?((d.latestQuote.ap+d.latestQuote.bp)/2):0);
+  if(!price)return null;
+  const open=d.dailyBar?.o||price;
+  const chg=+(price-open).toFixed(2);
+  const chgPct=open?+(chg/open*100).toFixed(2):0;
+  const high=d.dailyBar?.h||price;
+  const low=d.dailyBar?.l||price;
+  const vol=d.dailyBar?.v||0;
+  return{price:+price.toFixed(2),open:+open.toFixed(2),high:+high.toFixed(2),low:+low.toFixed(2),
+    chg,chgPct,vol,bid:d.latestQuote?.bp||0,ask:d.latestQuote?.ap||0,
+    prevClose:d.prevDailyBar?.c||price,week52High:d.dailyBar?.h,week52Low:d.dailyBar?.l};
 }
 
 // ── TRADIER OPTION CHAIN ──────────────────────────────────────
 async function apiGetOptionChain(sym,exp){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
-    const r=await fetch(endpoint+'/markets/options/chains?symbol='+sym+'&expiration='+exp+'&greeks=true',
-      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    const r=await fetch(tradierBase()+'/markets/options/chains?symbol='+sym+'&expiration='+exp+'&greeks=true',{headers:tradierHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     return d?.options?.option||null;
-  }catch(e){console.warn('Tradier chain error:',e);return null;}
+  }catch(e){console.warn('Tradier chain error (CORS?):',e.message);return null;}
 }
 
 // ── TRADIER OPTION EXPIRATIONS ────────────────────────────────
 async function apiGetExpirations(sym){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
-    const r=await fetch(endpoint+'/markets/options/expirations?symbol='+sym+'&includeAllRoots=true',
-      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    const r=await fetch(tradierBase()+'/markets/options/expirations?symbol='+sym+'&includeAllRoots=true',{headers:tradierHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     return d?.expirations?.date||null;
   }catch(e){return null;}
 }
 
+// ── TRADIER BASE URL (with proxy support) ─────────────────────
+function tradierBase(){
+  if(window.TRADIER_PROXY)return window.TRADIER_PROXY;
+  return API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
+}
+function tradierHeaders(){
+  return{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'};
+}
+
 // ── TRADIER QUOTE ─────────────────────────────────────────────
 async function apiTradierQuote(sym){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
-    const r=await fetch(endpoint+'/markets/quotes?symbols='+sym,
-      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    const r=await fetch(tradierBase()+'/markets/quotes?symbols='+sym,{headers:tradierHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     const q=d?.quotes?.quote;
     if(!q)return null;
-    return{price:q.last||q.close,open:q.open,high:q.high,low:q.low,
-      chg:q.change,chgPct:q.change_percentage,vol:q.volume,
+    return{price:q.last||q.close||0,open:q.open,high:q.high,low:q.low,
+      chg:q.change||0,chgPct:q.change_percentage||0,vol:q.volume,
       bid:q.bid,ask:q.ask,prevClose:q.prevclose,
       week52High:q.week_52_high,week52Low:q.week_52_low};
-  }catch(e){return null;}
+  }catch(e){console.warn('Tradier quote error (CORS?):', e.message);return null;}
 }
 
 // ── TRADIER HISTORICAL (for HV calculation) ───────────────────
 async function apiGetHistory(sym,days){
   if(!API_CONFIG.tradier.key)return null;
   try{
-    const endpoint=API_CONFIG.tradier.sandbox?'https://sandbox.tradier.com/v1':'https://api.tradier.com/v1';
     const start=new Date(Date.now()-days*24*60*60*1000).toISOString().slice(0,10);
-    const r=await fetch(endpoint+'/markets/history?symbol='+sym+'&interval=daily&start='+start,
-      {headers:{Authorization:'Bearer '+API_CONFIG.tradier.key,Accept:'application/json'}});
+    const r=await fetch(tradierBase()+'/markets/history?symbol='+sym+'&interval=daily&start='+start,{headers:tradierHeaders()});
     if(!r.ok)return null;
     const d=await r.json();
     return d?.history?.day||null;
@@ -2543,6 +2571,69 @@ function startLiveRefresh(){
 async function apiGetQuote(sym){
   const q=await apiTradierQuote(sym)||await apiGetSnapshot(sym);
   return q;
+}
+
+// ── CLOUDFLARE WORKER CODE GENERATOR ─────────────────────────
+function tradierShowWorkerCode(){
+  const code=`// Cloudflare Worker — Tradier CORS Proxy
+// 1. Ve a https://workers.cloudflare.com y crea una cuenta (gratis)
+// 2. Crea un nuevo Worker y pega este codigo
+// 3. Despliega y copia la URL (ej: https://mi-proxy.workers.dev)
+// 4. Pega esa URL en el campo "Proxy URL" del terminal
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const tradierBase = 'https://api.tradier.com/v1';
+    const path = url.pathname + url.search;
+    const token = request.headers.get('Authorization');
+
+    const tradierRes = await fetch(tradierBase + path, {
+      method: request.method,
+      headers: {
+        'Authorization': token || '',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: request.method !== 'GET' ? request.body : undefined,
+    });
+
+    const data = await tradierRes.json();
+
+    return new Response(JSON.stringify(data), {
+      status: tradierRes.status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Accept, Content-Type',
+      },
+    });
+  }
+};`;
+  // Show in a modal
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  const box=document.createElement('div');
+  box.style.cssText='background:#0d1520;border:1px solid #1e3050;border-radius:10px;padding:24px;width:640px;max-width:95vw;max-height:80vh;overflow-y:auto;';
+  var closeId2='cfw'+Date.now();
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="color:#3b82f6;font-size:14px;font-weight:600">Cloudflare Worker Proxy para Tradier</span><button id="'+closeId2+'" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer">X</button></div>'
+    +'<div style="font-size:10px;color:#64748b;margin-bottom:10px;line-height:1.7">Este Worker actúa como proxy entre tu browser y Tradier, añadiendo los headers CORS necesarios. <b style="color:#e8b84b">Es completamente gratuito</b> (100k requests/día en el plan free de Cloudflare).</div>'
+    +'<pre style="background:#060a0f;border:1px solid #1a2535;border-radius:6px;padding:12px;font-size:10px;color:#94a3b8;overflow-x:auto;white-space:pre-wrap;line-height:1.6">'+code.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre>'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+      +'<button id="cfwCopyBtn" style="background:#3b82f6;border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:600;padding:8px 16px;cursor:pointer">Copiar codigo</button>'
+      +'<a href="https://workers.cloudflare.com" target="_blank" style="background:#1a2535;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-size:11px;padding:8px 14px;text-decoration:none;display:flex;align-items:center">Ir a Cloudflare Workers →</a>'
+    +'</div>';
+  overlay.appendChild(box);
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+  // Wire up close button after DOM insertion
+  var closeBtn=document.getElementById(closeId2);
+  if(closeBtn)closeBtn.onclick=function(){overlay.remove();};
+  var copyBtn=document.getElementById('cfwCopyBtn');
+  if(copyBtn)copyBtn.onclick=function(){
+    navigator.clipboard.writeText(code).then(function(){copyBtn.textContent='Copiado!';setTimeout(function(){copyBtn.textContent='Copiar codigo';},2000);}).catch(function(){copyBtn.textContent='Error al copiar';});
+  };
 }
 
 // ── EXPANDED TICKER DATABASE (100+ symbols) ────────────────────
@@ -3266,9 +3357,11 @@ function openModal(){document.getElementById('modalOverlay').classList.add('open
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
 function saveTradier(){
   const key=document.getElementById('tradierKey').value.trim();
+  const proxyUrl=(document.getElementById('tradierProxyUrl')?.value||'').trim();
   APP.tradierToken=key;
   API_CONFIG.tradier.key=key;
   API_CONFIG.tradier.sandbox=document.getElementById('tradierEnv')?.value==='sandbox';
+  if(proxyUrl){window.TRADIER_PROXY=proxyUrl;localStorage.setItem('tradier_proxy',proxyUrl);}
   localStorage.setItem('tradier_key',key);
   localStorage.setItem('tradier_env',API_CONFIG.tradier.sandbox?'sandbox':'live');
   document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>Token guardado';
@@ -3279,11 +3372,37 @@ function saveTradier(){
   startLiveRefresh();
 }
 function testTradier(){
-  const st=document.getElementById('tradierStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
-  const base=document.getElementById('tradierEnv').value==='live'?'https://api.tradier.com':'https://sandbox.tradier.com';
-  fetch(`${base}/v1/user/profile`,{headers:{Authorization:`Bearer ${APP.tradierToken}`,Accept:'application/json'}})
-    .then(r=>r.json()).then(d=>{if(d.profile){st.innerHTML=`<span class="cfg-dot live"></span>Conectado: ${d.profile.name}`;document.getElementById('tradierBadge').className='abadge ok';}else st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Token inválido';})
-    .catch(()=>st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error CORS — requiere proxy backend');
+  var st=document.getElementById('tradierStatus');
+  st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
+  var key=document.getElementById('tradierKey').value.trim()||API_CONFIG.tradier.key;
+  var env=document.getElementById('tradierEnv').value;
+  var base=env==='live'?'https://api.tradier.com':'https://sandbox.tradier.com';
+  var proxyBase=window.TRADIER_PROXY||null;
+  // Try direct first (works if server sends CORS headers), else show proxy instructions
+  var url=(proxyBase||base)+'/v1/user/profile';
+  fetch(url,{headers:{Authorization:'Bearer '+key,Accept:'application/json'}})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.profile){
+      APP.tradierToken=key;API_CONFIG.tradier.key=key;
+      st.innerHTML='<span class="cfg-dot live"></span>Conectado: '+d.profile.name;
+      document.getElementById('tradierBadge').className='abadge ok';
+      document.getElementById('tradierBadge').textContent='TRADIER ●';
+      // Fetch live SPY quote to confirm data works
+      apiTradierQuote('SPY').then(function(q){if(q)st.innerHTML+=' | SPY $'+q.price.toFixed(2);});
+    } else {
+      st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>'+(d.fault?'Token inválido':'Error: '+JSON.stringify(d).slice(0,60));
+    }
+  })
+  .catch(function(e){
+    // CORS blocked - token is probably fine, show instructions
+    st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Token guardado (CORS: ver instrucciones abajo)';
+    document.getElementById('tradierCorsNote').style.display='block';
+    document.getElementById('tradierBadge').className='abadge ok';
+    document.getElementById('tradierBadge').textContent='TRADIER ●';
+    APP.tradierToken=key;API_CONFIG.tradier.key=key;
+    console.log('Tradier CORS blocked - token saved locally, use proxy for browser requests');
+  });
 }
 function saveAlpaca(){
   const key=document.getElementById('alpacaKey').value.trim();
@@ -3305,11 +3424,37 @@ function saveAlpaca(){
   });
 }
 function testAlpaca(){
-  const st=document.getElementById('alpacaStatus');st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
-  const base=document.getElementById('alpacaEnv').value==='paper'?'https://paper-api.alpaca.markets':'https://api.alpaca.markets';
-  fetch(`${base}/v2/account`,{headers:{'APCA-API-KEY-ID':APP.alpacaKey,'APCA-API-SECRET-KEY':APP.alpacaSecret}})
-    .then(r=>r.json()).then(d=>{if(d.account_number){st.innerHTML=`<span class="cfg-dot live"></span>Cuenta: ${d.account_number}`;document.getElementById('alpacaBadge').className='abadge ok';}else st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Credenciales inválidas';})
-    .catch(()=>st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error de red');
+  var st=document.getElementById('alpacaStatus');
+  st.innerHTML='<span class="cfg-dot" style="background:#FFB800"></span>Probando...';
+  var key=document.getElementById('alpacaKey').value.trim()||API_CONFIG.alpaca.key;
+  var secret=document.getElementById('alpacaSecret').value.trim()||API_CONFIG.alpaca.secret;
+  var env=document.getElementById('alpacaEnv').value;
+  var headers={'APCA-API-KEY-ID':key,'APCA-API-SECRET-KEY':secret};
+  // Test with market data endpoint (works for all key types)
+  fetch('https://data.alpaca.markets/v2/stocks/SPY/trades/latest',{headers:headers})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.trade&&d.trade.p){
+      // Also try account endpoint for full account info
+      var acctBase=env==='paper'?'https://paper-api.alpaca.markets':'https://api.alpaca.markets';
+      fetch(acctBase+'/v2/account',{headers:headers})
+      .then(function(r2){return r2.json();})
+      .then(function(d2){
+        var acctInfo=d2.account_number?(' — Cuenta: '+d2.account_number):'';
+        st.innerHTML='<span class="cfg-dot live"></span>Conectado'+acctInfo+' | SPY: $'+d.trade.p.toFixed(2);
+        document.getElementById('alpacaBadge').className='abadge ok';
+        document.getElementById('alpacaBadge').textContent='ALPACA ●';
+      }).catch(function(){
+        st.innerHTML='<span class="cfg-dot live"></span>Data OK | SPY: $'+d.trade.p.toFixed(2)+' (solo datos)';
+        document.getElementById('alpacaBadge').className='abadge ok';
+      });
+    } else {
+      st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error: '+(d.message||d.code||'Credenciales inválidas');
+    }
+  })
+  .catch(function(e){
+    st.innerHTML='<span class="cfg-dot" style="background:#FF4444"></span>Error de red: '+e.message;
+  });
 }
 
 
@@ -4296,29 +4441,37 @@ window.switchMain=function(id,el){_origSM5(id,el);if(id==='journal'){setTimeout(
 (function restoreApiKeys(){
   const tk=localStorage.getItem('tradier_key');
   const te=localStorage.getItem('tradier_env')||'sandbox';
+  const tp=localStorage.getItem('tradier_proxy')||'';
   if(tk){
     APP.tradierToken=tk;API_CONFIG.tradier.key=tk;API_CONFIG.tradier.sandbox=(te==='sandbox');
+    if(tp){window.TRADIER_PROXY=tp;}
     const inp=document.getElementById('tradierKey');if(inp)inp.value=tk;
+    const env=document.getElementById('tradierEnv');if(env)env.value=te;
+    const proxy=document.getElementById('tradierProxyUrl');if(proxy&&tp)proxy.value=tp;
     document.getElementById('tradierBadge').className='abadge ok';
     document.getElementById('tradierBadge').textContent='TRADIER ●';
-    document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>API Key restaurada';
+    document.getElementById('tradierStatus').innerHTML='<span class="cfg-dot live"></span>✓ Token restaurado'+(tp?' + Proxy':'');
   }
   const ak=localStorage.getItem('alpaca_key');
-  const as=localStorage.getItem('alpaca_secret');
+  const as2=localStorage.getItem('alpaca_secret');
   const ae=localStorage.getItem('alpaca_env')||'paper';
   if(ak){
-    APP.alpacaKey=ak;APP.alpacaSecret=as||'';APP.alpacaEnv=ae;
-    API_CONFIG.alpaca.key=ak;API_CONFIG.alpaca.secret=as||'';API_CONFIG.alpaca.paper=(ae==='paper');
+    APP.alpacaKey=ak;APP.alpacaSecret=as2||'';APP.alpacaEnv=ae;
+    API_CONFIG.alpaca.key=ak;API_CONFIG.alpaca.secret=as2||'';API_CONFIG.alpaca.paper=(ae==='paper');
     const ki=document.getElementById('alpacaKey');if(ki)ki.value=ak;
-    const si=document.getElementById('alpacaSecret');if(si)si.value=as||'';
+    const si=document.getElementById('alpacaSecret');if(si)si.value=as2||'';
+    const ei=document.getElementById('alpacaEnv');if(ei)ei.value=ae;
     document.getElementById('alpacaBadge').className='abadge ok';
     document.getElementById('alpacaBadge').textContent='ALPACA ●';
-    document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>API Key restaurada';
+    document.getElementById('alpacaStatus').innerHTML='<span class="cfg-dot live"></span>✓ Keys restauradas';
   }
   if(tk||ak){
     setTimeout(function(){
-      apiFetchAll(APP.sym).then(function(){startLiveRefresh();});
-    },500);
+      apiFetchAll(APP.sym).then(function(r){
+        if(r&&r.quote)startLiveRefresh();
+        console.log('API startup fetch:', r?'OK':'No data (CORS or missing keys)');
+      });
+    },800);
   }
 })();
 
