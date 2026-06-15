@@ -3350,13 +3350,17 @@ function mscGetSignals(strat,rsi,iv,ivRank,hv20){
   if(strat==='iron_condor'&&rsi>40&&rsi<60)signals.push({text:'RSI Neutral Zone',icon:'⚡',color:'#22c55e'});
   return signals.slice(0,3);
 }
-function mscLogoHTML(sym,size=28){
-  const url=getTickerLogo(sym);
+function mscLogoHTML(sym,size){
+  size=size||28;
   const letter=sym.slice(0,2);
   const colors=['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16'];
   const color=colors[sym.charCodeAt(0)%colors.length];
-  if(url)return `<img src="${url}" onerror="this.parentElement.innerHTML='<div style=\"width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*.38)}px;font-weight:700;color:#fff;flex-shrink:0\">${letter}</div>'" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="${sym}">`;
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*.38)}px;font-weight:700;color:#fff;flex-shrink:0">${letter}</div>`;
+  const sz=size+'px';
+  // Always use letter avatar — Clearbit logos are often blocked by CORS anyway
+  const div=document.createElement('div');
+  div.style.cssText='width:'+sz+';height:'+sz+';border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:'+Math.round(size*.4)+'px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:-1px;font-family:Inter,sans-serif';
+  div.textContent=letter;
+  return div.outerHTML;
 }
 function mscCalcScore(sym,strat,iv,price,vol){
   const ivScore=Math.min(iv/100*30,30);
@@ -3481,46 +3485,67 @@ function mscRenderCards(){
   if(cv)cv.style.display='block';if(tv)tv.style.display='none';if(sr)sr.style.display='none';
   if(!cv)return;
   if(!MSC.results.length){cv.innerHTML='<div class="msc-empty"><div class="msc-empty-icon">🔍</div><div class="msc-empty-title">No results found</div><div class="msc-empty-sub">Try relaxing your filters</div></div>';return;}
-  cv.innerHTML=MSC.results.map((r,i)=>{
-    const sc=r.score>=70?'high':r.score>=50?'med':'low';
-    const chgUp=r.chg>=0;
-    const prem=r.premium>0?`<span style="color:#22c55e">+$${r.premium}</span>`:`<span style="color:#ef4444">-$${Math.abs(r.premium)}</span>`;
-    const mp=r.maxProfit>999999?'∞':r.maxProfit<0?'—':`$${r.maxProfit.toLocaleString()}`;
-    const rsiState=mscGetRSIState(r.rsi||50);
-    const ivVsHV=r.hv20?Math.round((r.iv/r.hv20)*100):100;
-    const sigHtml=(r.signals||[]).map(s=>`<span style="font-size:8px;color:${s.color};background:${s.color}18;border:1px solid ${s.color}44;border-radius:3px;padding:1px 6px;white-space:nowrap">${s.icon} ${s.text}</span>`).join('');
-    return `<div class="msc-card" onclick="mscShowDetail(${i})" style="grid-template-columns:auto 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto">
-      <div style="display:flex;align-items:center;gap:8px">
-        ${mscLogoHTML(r.sym,32)}
-        <div><div class="msc-card-sym">${r.sym}</div><div class="msc-card-name" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</div><div style="margin-top:3px"><span style="font-size:7px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px;font-family:'JetBrains Mono',monospace">${r.sector}</span></div></div>
-      </div>
-      <div><div style="font-size:8px;color:#334155;margin-bottom:2px">Price</div><div class="msc-card-price">$${r.price.toLocaleString()}</div><div class="msc-card-chg ${chgUp?'up':'dn'}">${chgUp?'+':''}${r.chg} (${(r.chg/r.price*100).toFixed(1)}%)</div></div>
-      <div class="msc-card-metric">
-        <div class="msc-card-metric-lbl">IV% / HV20</div>
-        <div class="msc-card-metric-val amber">${r.iv}% <span style="color:#475569;font-size:9px">/ ${r.hv20||'—'}%</span></div>
-        <div style="font-size:8px;color:${ivVsHV>120?'#22c55e':ivVsHV<80?'#ef4444':'#64748b'};margin-top:1px">IV/HV: ${ivVsHV}%</div>
-      </div>
-      <div class="msc-card-metric">
-        <div class="msc-card-metric-lbl">IV Rank / IVP</div>
-        <div class="msc-card-metric-val" style="color:${(r.ivRank||0)>60?'#22c55e':(r.ivRank||0)<30?'#ef4444':'#f59e0b'}">${r.ivRank||'—'}%</div>
-        <div style="font-size:8px;color:#475569;margin-top:1px">IVP: ${r.ivPct||'—'}%</div>
-      </div>
-      <div class="msc-card-metric">
-        <div class="msc-card-metric-lbl">RSI (14)</div>
-        <div class="msc-card-metric-val" style="color:${rsiState.color}">${r.rsi||'—'}</div>
-        <div style="font-size:8px;color:${rsiState.color};margin-top:1px">${rsiState.label}</div>
-      </div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Premium / POP</div><div class="msc-card-metric-val" style="font-size:11px">${prem}</div><div style="font-size:9px;color:#22c55e;margin-top:1px">POP: ${r.pop}%</div></div>
-      <div class="msc-card-metric"><div class="msc-card-metric-lbl">Max Profit / DTE</div><div class="msc-card-metric-val green" style="font-size:11px">${mp}</div><div style="font-size:9px;color:#3b82f6;margin-top:1px">${r.dte}d exp</div></div>
-      <div style="grid-column:span 1">
-        <div style="font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Signals</div>
-        <div style="display:flex;flex-direction:column;gap:3px">${sigHtml||'<span style="font-size:8px;color:#334155">—</span>'}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
-        <div class="msc-card-score ${sc}">${r.score}</div>
-        <div class="msc-card-action" onclick="event.stopPropagation();mscShowDetail(${i})">Trade →</div>
-      </div>
-    </div>`;
+  cv.innerHTML=MSC.results.map(function(r,i){
+    var sc=r.score>=70?'high':r.score>=50?'med':'low';
+    var chgUp=r.chg>=0;
+    var premColor=r.premium>0?'#22c55e':'#ef4444';
+    var premStr=(r.premium>0?'+':'-')+'$'+Math.abs(r.premium);
+    var mp=r.maxProfit>999999?'Unlimited':r.maxProfit<0?'N/A':'$'+r.maxProfit.toLocaleString();
+    var rsiState=mscGetRSIState(r.rsi||50);
+    var ivVsHV=r.hv20?Math.round((r.iv/r.hv20)*100):100;
+    var ivVsHVColor=ivVsHV>120?'#22c55e':ivVsHV<80?'#ef4444':'#64748b';
+    var ivRankColor=(r.ivRank||0)>60?'#22c55e':(r.ivRank||0)<30?'#ef4444':'#f59e0b';
+    var sigParts=(r.signals||[]).map(function(s){
+      return '<div style="font-size:8px;padding:2px 6px;border-radius:3px;margin-bottom:2px;background:'+s.color+'18;color:'+s.color+';border:1px solid '+s.color+'44">'+s.icon+' '+s.text+'</div>';
+    }).join('');
+    var logoHtml=mscLogoHTML(r.sym,30);
+    return '<div class="msc-card" onclick="mscShowDetail('+i+')">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +logoHtml
+        +'<div>'
+          +'<div class="msc-card-sym">'+r.sym+'</div>'
+          +'<div class="msc-card-name">'+r.name.slice(0,20)+'</div>'
+          +'<div style="margin-top:3px"><span style="font-size:7px;color:#334155;background:#1a2535;border-radius:2px;padding:1px 5px;font-family:JetBrains Mono,monospace">'+r.sector+'</span></div>'
+        +'</div>'
+      +'</div>'
+      +'<div>'
+        +'<div class="msc-card-price">$'+r.price.toLocaleString()+'</div>'
+        +'<div class="msc-card-chg '+(chgUp?'up':'dn')+'">'+(chgUp?'+':'')+r.chg+' ('+(r.chg/r.price*100).toFixed(1)+'%)</div>'
+      +'</div>'
+      +'<div class="msc-card-metric">'
+        +'<div class="msc-card-metric-lbl">IV% / HV 20D</div>'
+        +'<div class="msc-card-metric-val amber">'+r.iv+'% <span style="color:#475569;font-size:9px">/ '+(r.hv20||'—')+'%</span></div>'
+        +'<div style="font-size:8px;color:'+ivVsHVColor+';margin-top:1px">IV/HV: '+ivVsHV+'%</div>'
+      +'</div>'
+      +'<div class="msc-card-metric">'
+        +'<div class="msc-card-metric-lbl">IV Rank / IVP</div>'
+        +'<div class="msc-card-metric-val" style="color:'+ivRankColor+'">'+(r.ivRank||'—')+'%</div>'
+        +'<div style="font-size:8px;color:#475569;margin-top:1px">IVP: '+(r.ivPct||'—')+'%</div>'
+      +'</div>'
+      +'<div class="msc-card-metric">'
+        +'<div class="msc-card-metric-lbl">RSI (14)</div>'
+        +'<div class="msc-card-metric-val" style="color:'+rsiState.color+'">'+(r.rsi||'—')+'</div>'
+        +'<div style="font-size:8px;color:'+rsiState.color+';margin-top:1px">'+rsiState.label+'</div>'
+      +'</div>'
+      +'<div class="msc-card-metric">'
+        +'<div class="msc-card-metric-lbl">Premium / POP</div>'
+        +'<div class="msc-card-metric-val" style="color:'+premColor+'">'+premStr+'</div>'
+        +'<div style="font-size:9px;color:#22c55e;margin-top:1px">POP: '+r.pop+'%</div>'
+      +'</div>'
+      +'<div class="msc-card-metric">'
+        +'<div class="msc-card-metric-lbl">Max Profit / DTE</div>'
+        +'<div class="msc-card-metric-val green" style="font-size:11px">'+mp+'</div>'
+        +'<div style="font-size:9px;color:#3b82f6;margin-top:1px">'+r.dte+'d exp</div>'
+      +'</div>'
+      +'<div>'
+        +'<div style="font-size:7px;color:#334155;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">SIGNALS</div>'
+        +(sigParts||'<div style="font-size:8px;color:#334155">—</div>')
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:5px">'
+        +'<div class="msc-card-score '+sc+'">'+r.score+'</div>'
+        +'<div class="msc-card-action" onclick="event.stopPropagation();mscShowDetail('+i+')">Trade</div>'
+      +'</div>'
+    +'</div>';
   }).join('');
 }
 
@@ -3531,24 +3556,30 @@ function mscRenderTable(){
   if(cv)cv.style.display='none';if(tv)tv.style.display='block';if(sr)sr.style.display='flex';
   const tb=document.getElementById('mscTableBody');if(!tb)return;
   if(!MSC.results.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:#334155">No results found — try relaxing filters</td></tr>';return;}
-  tb.innerHTML=MSC.results.map((r,i)=>{
-    const sc=r.score>=70?'#22c55e':r.score>=50?'#f59e0b':'#ef4444';
-    const mp=r.maxProfit>999999?'∞':`$${r.maxProfit.toLocaleString()}`;
-    const ml=`$${Math.abs(r.maxLoss).toLocaleString()}`;
-    const chgUp=r.chg>=0;
-    return `<tr onclick="mscShowDetail(${i})">
-      <td><span style="color:#e0e8f4;font-weight:600">${r.sym}</span><span style="color:#475569;font-size:9px;margin-left:5px">${r.name.slice(0,18)}</span></td>
-      <td>$${r.price.toFixed(2)}</td>
-      <td style="color:${chgUp?'#22c55e':'#ef4444'}">${chgUp?'+':''}${r.chg}</td>
-      <td style="color:#f59e0b">${r.iv}%</td>
-      <td style="color:${r.premium>=0?'#22c55e':'#ef4444'}">${r.premium>=0?'+':''}$${Math.abs(r.premium)}</td>
-      <td style="color:#22c55e">${r.pop}%</td>
-      <td style="color:#22c55e">${mp}</td>
-      <td style="color:#ef4444">${ml}</td>
-      <td style="color:#3b82f6">${r.dte}d</td>
-      <td><span style="color:${sc};font-weight:700">${r.score}</span></td>
-      <td><button class="msc-card-action" onclick="event.stopPropagation();mscShowDetail(${i})">Trade →</button></td>
-    </tr>`;
+  tb.innerHTML=MSC.results.map(function(r,i){
+    var sc=r.score>=70?'#22c55e':r.score>=50?'#f59e0b':'#ef4444';
+    var mp=r.maxProfit>999999?'Unlimited':'$'+r.maxProfit.toLocaleString();
+    var chgUp=r.chg>=0;
+    var rsiState=mscGetRSIState(r.rsi||50);
+    var ivRankColor=(r.ivRank||0)>60?'#22c55e':(r.ivRank||0)<30?'#ef4444':'#f59e0b';
+    var sigParts=(r.signals||[]).slice(0,2).map(function(s){return '<span style="font-size:7px;color:'+s.color+'">'+s.icon+' '+s.text+'</span>';}).join('<br>');
+    var logoHtml=mscLogoHTML(r.sym,20);
+    return '<tr onclick="mscShowDetail('+i+')">'
+      +'<td><div style="display:flex;align-items:center;gap:6px">'+logoHtml+'<div><span style="color:#e0e8f4;font-weight:600">'+r.sym+'</span><div style="color:#475569;font-size:8px">'+r.name.slice(0,16)+'</div></div></div></td>'
+      +'<td>$'+r.price.toFixed(2)+'</td>'
+      +'<td style="color:'+(chgUp?'#22c55e':'#ef4444')+'">'+(chgUp?'+':'')+r.chg+'</td>'
+      +'<td style="color:#f59e0b">'+r.iv+'%</td>'
+      +'<td style="color:'+ivRankColor+';font-weight:600">'+(r.ivRank||'--')+'%</td>'
+      +'<td style="color:#94a3b8">'+(r.hv20||'--')+'%</td>'
+      +'<td style="color:'+rsiState.color+'">'+r.rsi+' <span style="font-size:8px">'+rsiState.label+'</span></td>'
+      +'<td style="color:'+(r.premium>=0?'#22c55e':'#ef4444')+'">'+(r.premium>=0?'+':'-')+'$'+Math.abs(r.premium)+'</td>'
+      +'<td style="color:#22c55e">'+r.pop+'%</td>'
+      +'<td style="color:#22c55e">'+mp+'</td>'
+      +'<td style="color:#3b82f6">'+r.dte+'d</td>'
+      +'<td><span style="color:'+sc+';font-weight:700">'+r.score+'</span></td>'
+      +'<td style="font-size:9px;line-height:1.6">'+(sigParts||'--')+'</td>'
+      +'<td><button class="msc-card-action" onclick="event.stopPropagation();mscShowDetail('+i+')">Trade</button></td>'
+    +'</tr>';
   }).join('');
 }
 
